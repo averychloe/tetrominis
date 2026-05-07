@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tetrominis</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <div id="playfield-container" style="display: flex; position: absolute; top: 50vh; left: 50vw; transform: translate(-50%, -50%);">
+        <div id="player-hold-and-text-container" style="display:flex; flex-direction: column; width: 150px;">
+            <div id="player-hold-text" style="background-color: white; height: 20px;">
+                <p style="margin: 0px; margin-left: 5px;">hold</p>
+            </div>
+            <div id="player-hold" style="height: 90px; background-color: #333; display: flex; justify-content: center; align-items: center;">
+            
+            </div>
+            <div>
+                <p id="spin-text"> </p>
+                <p id="clear-text" style="font-size: 3em; margin: 5px;"> </p>
+                <p id="combo-text" style="font-size: 2em; margin: 5px;"> </p>
+                <p id="b2b-text" style="font-size: 2em; margin: 5px;"> </p>
+            </div>
+        </div>
+        <div id="player-garbage-display" class="garbage-display" style="align-self: flex-end;">
+            <div id="player-garbage-red-bar" style="width: 100%; background-color: red; position: absolute; bottom: 0px;"></div>
+        </div>
+        <div id="player-playfield" class="playfield">
+        </div>
+        <div id="player-next-container" style="display:flex; flex-direction: column; width: 150px;">
+            <div id="player-next-text" style="background-color: white; height: 20px;">
+                <p style="margin: 0px; margin-left: 5px;">next</p>
+            </div>
+            <div id="player-next" style="height: 450px; background-color: #333; display:flex; flex-direction: column;">
+            
+            </div>
+        </div>
+    </div>
+
+    
+    
+    <script src="./scripts.js"></script>
+</body>
+</html>

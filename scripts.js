@@ -1,0 +1,989 @@
+// ------------------- VARIABLES---------------------
+const squareSize = 30
+let previewLength = 5
+
+const showCenterOfRotationOfMovingPiece = true;
+let hasDied = false;
+
+let combo = -1;
+let b2b = -1;
+
+const SRSJLSTZKickTable = {
+    "0toL": [[0,0], [1,0], [1,1], [0,-2], [1,-2]],
+    "Lto2": [[0,0], [-1,0], [-1,-1], [0,2], [-1,2]],
+    "2toR": [[0,0], [-1,0], [-1,1], [0,-2], [-1,-2]],
+    "Rto0": [[0,0], [1,0], [1,-1], [0,2], [1,2]],
+    "Lto0": [[0,0], [-1,0], [-1,-1], [0,2], [-1,2]],
+    "2toL": [[0,0], [1,0], [1,1], [0,-2], [1,-2]],
+    "Rto2": [[0,0], [1,0], [1,-1], [0,2], [1,2]],
+    "0toR": [[0,0], [-1,0], [-1,1], [0,-2], [-1,-2]],
+}
+
+const SRSIKickTable = {
+    "0toL": [[0,0], [-1,0], [2,0], [2,-1], [-1,2]],
+    "Lto2": [[0,0], [-1,0], [2,0], [-1,-2], [2,1]],
+    "2toR": [[0,0], [-2,0], [1,0], [-2,1], [1,-2]],
+    "Rto0": [[0,0], [1,0], [-2, 0], [1, 2], [-2, -1]],
+    "Lto0": [[0,0], [1,0], [-2,0], [1,-2], [-2,1]],
+    "2toL": [[0,0], [2,0], [-1,0], [2,1], [-1,-2]],
+    "Rto2": [[0,0], [-1,0], [2, 0], [-1, 2], [2, -1]],
+    "0toR": [[0,0], [1,0], [-2,0], [-2,-1], [1,2]],
+}
+
+const flipKickTable = {
+    "0to2": [[0,0], [0,1], [1,1], [-1,1], [1,0], [-1,0]],
+    "2to0": [[0,0], [0,-1], [-1,-1], [1,-1], [-1,0], [1,0]],
+    "LtoR": [[0,0], [1,0], [1,2], [1,1], [0,2], [0,1]],
+    "RtoL": [[0,0], [-1,0], [-1,2], [-1,1], [0,2], [0,1]],
+}
+
+let playerBoardState = []
+let playerSquareManagers = []
+let PlayerHoldManager, PlayerNextManager, PlayerCurrentPieceManager;
+let DASLeftTimeout, DASRightTimeout;
+
+// HANDLING
+// all variables are in milliseconds!
+// const ARR = 0 Not implemented: ARR automatically assumed to be 0. Like, at least I play like that.
+const DAS = 100
+const DCD = 20
+
+// CONTROLS
+const controls = {
+    "CCW": "a",
+    "CW": "d",
+    "ROTATE180": "w",
+    "HOLD": "s",
+    "MOVE_LEFT": "k",
+    "MOVE_RIGHT": ";",
+    "SOFT_DROP": "o",
+    "HARD_DROP": "l"
+}
+
+// -------------------- ELEMENTS ---------------------
+const playerBoard = document.getElementById("player-playfield")
+const DOMSpinTextDisplay = document.getElementById("spin-text")
+const DOMClearTextDisplay = document.getElementById("clear-text")
+const DOMComboTextDisplay = document.getElementById("combo-text")
+const DOMB2BTextDisplay = document.getElementById("b2b-text")
+
+// -------------------- CLASSES ---------------------
+class squareManager{
+    constructor(x, y){
+        this.x = x;
+        this.y = y;
+        this.contains = "empty";
+        this.DOMSquare = document.createElement("div");
+        this.DOMSquare.style.bottom = `${y * squareSize}px`;
+        this.DOMSquare.style.left = `${x * squareSize}px`;
+        this.DOMSquare.style.position = "absolute";
+        playerBoard.appendChild(this.DOMSquare);
+        this.refresh()
+    }
+
+    refresh(){
+        switch(this.contains){
+            case "empty":
+                this.DOMSquare.className = this.y < 20 ? "empty square" : "notshown noborder square";
+                break;
+            case "t":
+                this.DOMSquare.className = "t square";
+                break;
+            case "s":
+                this.DOMSquare.className = "s square";
+                break;  
+            case "z":
+                this.DOMSquare.className = "z square";
+                break;  
+            case "o":
+                this.DOMSquare.className = "o square";
+                break;  
+            case "i":
+                this.DOMSquare.className = "i square";
+                break;  
+            case "j":
+                this.DOMSquare.className = "j square";
+                break;  
+            case "l":
+                this.DOMSquare.className = "l square";
+                break;  
+            case "garbage":
+                this.DOMSquare.className = "garbage square";
+                break;      
+            default:
+                this.DOMSquare.className = this.y < 20 ? "empty square" : "notshown noborder square";
+                break;            
+        }
+    }
+
+    setContents(type){
+        this.contains = type;
+        this.refresh();
+    }
+
+    getContents(){
+        return this.contains
+    }
+}
+
+class playerHoldManager{
+    constructor(){
+        this.piece = "empty"
+        this.DOMHoldPieceContainer = document.createElement("div");
+        this.DOMHoldPieceContainer.style.position = "relative";
+        document.getElementById("player-hold").appendChild(this.DOMHoldPieceContainer);
+    }
+
+    addSquareToHold(type, x, y){
+        let newSquare = document.createElement("div");
+        newSquare.style.position = "absolute";
+        newSquare.style.bottom = `${y * squareSize}px`;
+        newSquare.style.left = `${x * squareSize}px`;
+        // newSquare.style.transform = "scale(103%)"
+        newSquare.className = `${type} square noborder`
+        this.DOMHoldPieceContainer.appendChild(newSquare);
+    }
+
+    clearHold(){
+        this.DOMHoldPieceContainer.innerHTML = "";
+    }
+
+    hold(piece){
+        this.clearHold();
+        this.piece = piece;
+        switch(piece){
+            case "t":
+                this.addSquareToHold("t", -3/2, -1)
+                this.addSquareToHold("t", -1/2, -1)
+                this.addSquareToHold("t", 1/2, -1)
+                this.addSquareToHold("t", -1/2, 0)
+                break;
+            case "s":
+                this.addSquareToHold("s", -3/2, -1)
+                this.addSquareToHold("s", -1/2, -1)
+                this.addSquareToHold("s", -1/2, 0)
+                this.addSquareToHold("s", 1/2, 0)
+                break;  
+            case "z":
+                this.addSquareToHold("z", -3/2, 0)
+                this.addSquareToHold("z", -1/2, 0)
+                this.addSquareToHold("z", -1/2, -1)
+                this.addSquareToHold("z", 1/2, -1)
+                break;  
+            case "o":
+                this.addSquareToHold("o", -1, -1)
+                this.addSquareToHold("o", 0, -1)
+                this.addSquareToHold("o", -1, 0)
+                this.addSquareToHold("o", 0, 0)
+                break;  
+            case "i":
+                this.addSquareToHold("i", -2, -1/2)
+                this.addSquareToHold("i", -1, -1/2)
+                this.addSquareToHold("i", 0, -1/2)
+                this.addSquareToHold("i", 1, -1/2)
+                break;  
+            case "j":
+                this.addSquareToHold("j", -3/2, -1)
+                this.addSquareToHold("j", -1/2, -1)
+                this.addSquareToHold("j", 1/2, -1)
+                this.addSquareToHold("j", -3/2, 0)
+                break;  
+            case "l":
+                this.addSquareToHold("l", -3/2, -1)
+                this.addSquareToHold("l", -1/2, -1)
+                this.addSquareToHold("l", 1/2, -1)
+                this.addSquareToHold("l", 1/2, 0)
+                break;  
+            default:
+                alert(`did you know? ${piece} is not a real tetris piece`)
+        }
+    }
+
+    getHoldPiece(){
+        return this.piece
+    }
+}
+
+class playerNextManager{
+    constructor(){
+        let pieceContainers = []
+        let containerContents = []
+        for(let i = 0; i < previewLength; i++){
+            let newPieceContainer = document.createElement("div");
+            newPieceContainer.className = "piece-container"
+            newPieceContainer.style.position = "relative";
+            //lazy fix below, beware
+            newPieceContainer.style.transform = "translate(50%, -50%)";
+            document.getElementById("player-next").appendChild(newPieceContainer)
+            pieceContainers.push(newPieceContainer)
+            containerContents.push("")
+        }
+        this.pieceContainers = pieceContainers;
+        this.containerContents = containerContents;
+        this.bag = generateBag();
+        this.piecesUntilEndOfBag = 7-previewLength;
+        this.displayInitialQueue();
+    }
+
+    addSquareToContainer(pieceContainer, type, x, y){
+        let newSquare = document.createElement("div");
+        newSquare.style.position = "absolute";
+        newSquare.style.bottom = `${y * squareSize}px`;
+        newSquare.style.left = `${x * squareSize}px`;
+        // newSquare.style.transform = "scale(103%)"
+        newSquare.className = `${type} square noborder`
+        pieceContainer.appendChild(newSquare);
+    }
+
+    clearContainer(pieceContainer){
+        pieceContainer.innerHTML = "";
+    }
+
+    // like i could definitely use a refactor that puts coordinates for each square in a piece in a list or something. instead of hardcoding them. but unless i'm gonna add pentominoes this should be fine
+    putPieceInContainer(pieceContainer, piece){
+        this.clearContainer(pieceContainer)
+        switch(piece){
+            case "t":
+                this.addSquareToContainer(pieceContainer, "t", -3/2, -1)
+                this.addSquareToContainer(pieceContainer, "t", -1/2, -1)
+                this.addSquareToContainer(pieceContainer, "t", 1/2, -1)
+                this.addSquareToContainer(pieceContainer, "t", -1/2, 0)
+                break;
+            case "s":
+                this.addSquareToContainer(pieceContainer, "s", -3/2, -1)
+                this.addSquareToContainer(pieceContainer, "s", -1/2, -1)
+                this.addSquareToContainer(pieceContainer, "s", -1/2, 0)
+                this.addSquareToContainer(pieceContainer, "s", 1/2, 0)
+                break;  
+            case "z":
+                this.addSquareToContainer(pieceContainer, "z", -3/2, 0)
+                this.addSquareToContainer(pieceContainer, "z", -1/2, 0)
+                this.addSquareToContainer(pieceContainer, "z", -1/2, -1)
+                this.addSquareToContainer(pieceContainer, "z", 1/2, -1)
+                break;  
+            case "o":
+                this.addSquareToContainer(pieceContainer, "o", -1, -1)
+                this.addSquareToContainer(pieceContainer, "o", 0, -1)
+                this.addSquareToContainer(pieceContainer, "o", -1, 0)
+                this.addSquareToContainer(pieceContainer, "o", 0, 0)
+                break;  
+            case "i":
+                this.addSquareToContainer(pieceContainer, "i", -2, -1/2)
+                this.addSquareToContainer(pieceContainer, "i", -1, -1/2)
+                this.addSquareToContainer(pieceContainer, "i", 0, -1/2)
+                this.addSquareToContainer(pieceContainer, "i", 1, -1/2)
+                break;  
+            case "j":
+                this.addSquareToContainer(pieceContainer, "j", -3/2, -1)
+                this.addSquareToContainer(pieceContainer, "j", -1/2, -1)
+                this.addSquareToContainer(pieceContainer, "j", 1/2, -1)
+                this.addSquareToContainer(pieceContainer, "j", -3/2, 0)
+                break;  
+            case "l":
+                this.addSquareToContainer(pieceContainer, "l", -3/2, -1)
+                this.addSquareToContainer(pieceContainer, "l", -1/2, -1)
+                this.addSquareToContainer(pieceContainer, "l", 1/2, -1)
+                this.addSquareToContainer(pieceContainer, "l", 1/2, 0)
+                break;  
+            default:
+                alert(`did you know? ${piece} is not a valid tetris piece!`)
+        }
+    }
+
+    displayInitialQueue(){
+        for(let i = 0; i < previewLength; i++){
+            this.putPieceInContainer(
+                this.pieceContainers[i], 
+                this.bag[i]
+            );
+            this.containerContents[i] = this.bag[i];
+        }
+    }
+
+    advanceQueue(){
+        const piecePushedOut = this.containerContents[0]
+        if(this.piecesUntilEndOfBag==0){
+            this.bag=generateBag()
+            this.piecesUntilEndOfBag=7;
+        }
+        for(let i = 0; i < previewLength-1; i++){
+            this.putPieceInContainer(
+                this.pieceContainers[i], 
+                this.containerContents[i+1]
+            );
+            this.containerContents[i] = this.containerContents[i+1];
+        }
+        this.putPieceInContainer(this.pieceContainers[previewLength-1], this.bag[7-this.piecesUntilEndOfBag]);
+        this.containerContents[previewLength-1] = this.bag[7-this.piecesUntilEndOfBag]
+        this.piecesUntilEndOfBag--;
+
+        return piecePushedOut
+    }
+}
+
+class currentPieceManager{
+    constructor(){
+        this.squareCoordinates = [];
+        this.DOMSquares = [];
+        this.DOMGhost = [];
+        this.centerOfRotation = [];
+        this.piece = "";
+        this.centerOfRotationDOM = "";
+        this.TSTKickUsed = false;
+        this.currentRotationState = 0; // how many counterclockwise rotations have been applied. this is relevant for srs kicks.
+    }
+
+    getCurrentPiece(){
+        return this.piece;
+    }
+
+    startPlacingPiece(piece){
+        this.piece = piece;
+        this.TSTKickUsed = false;
+        this.currentRotationState = 0;
+        switch(piece){
+            case "i":
+                this.squareCoordinates = [[3, 21], [4, 21], [5, 21], [6, 21]]
+                this.centerOfRotation = [4.5, 20.5]
+                break;
+            case "j":
+                this.squareCoordinates = [[3, 21], [4, 21], [5, 21], [3, 22]]
+                this.centerOfRotation = [4, 21]
+                break;
+            case "o":
+                this.squareCoordinates = [[4, 22], [4, 21], [5, 21], [5, 22]]
+                this.centerOfRotation = [4.5, 21.5]
+                break;
+            case "l":
+                this.squareCoordinates = [[3, 21], [4, 21], [5, 21], [5, 22]]
+                this.centerOfRotation = [4, 21]
+                break;
+            case "s":
+                this.squareCoordinates = [[3, 21], [4, 21], [4, 22], [5, 22]]
+                this.centerOfRotation = [4, 21]
+                break;
+            case "t":
+                this.squareCoordinates = [[3, 21], [4, 21], [5, 21], [4, 22]]
+                this.centerOfRotation = [4, 21]
+                break;
+            case "z":
+                this.squareCoordinates = [[5, 21], [4, 21], [4, 22], [3, 22]]
+                this.centerOfRotation = [4, 21]
+                break;
+            default:
+                alert(`did you know? ${piece} is not a valid tetris piece!`)
+                break;
+        }
+        this.render();
+    }
+
+    renderPiece(){
+        if(this.DOMSquares.length == 0){
+            for(let i = 0; i < 4; i++){
+                let newSquare = document.createElement("div");
+                newSquare.style.bottom = `${this.squareCoordinates[i][1] * squareSize}px`;
+                newSquare.style.left = `${this.squareCoordinates[i][0] * squareSize}px`;
+                newSquare.style.position = "absolute";
+                newSquare.className = `${this.piece} square`
+                this.DOMSquares.push(newSquare)
+                playerBoard.appendChild(newSquare);
+            }
+        }
+        else{
+            for(let i = 0; i < 4; i++){
+                this.DOMSquares[i].style.bottom = `${this.squareCoordinates[i][1] * squareSize}px`;
+                this.DOMSquares[i].style.left = `${this.squareCoordinates[i][0] * squareSize}px`;
+                this.DOMSquares[i].style.position = "absolute";
+                this.DOMSquares[i].className = `${this.piece} square`
+                if(playerBoardState[this.squareCoordinates[i][1]][this.squareCoordinates[i][0]] != ""){
+                    lose()
+                }
+            }
+        }
+    }
+
+    checkVisibility(direction){
+        let visibility = 0;
+        let squaresCurrentlyBeingChecked = this.squareCoordinates.slice()
+        switch(direction){
+            case "up":
+                while(true){
+                    visibility++;
+                    for(let i = 0; i < 4; i++){
+                        if(squaresCurrentlyBeingChecked[i][1] + visibility > 29){
+                            return visibility-1;
+                        }
+                        if(playerBoardState[squaresCurrentlyBeingChecked[i][1] + visibility][squaresCurrentlyBeingChecked[i][0]] != ""){
+                            return visibility-1;
+                        }
+                    }
+                }
+                break;
+            case "down":
+                while(true){
+                    visibility++;
+                    for(let i = 0; i < 4; i++){
+                        if(squaresCurrentlyBeingChecked[i][1] - visibility < 0){
+                            return visibility-1;
+                        }
+                        if(playerBoardState[squaresCurrentlyBeingChecked[i][1] - visibility][squaresCurrentlyBeingChecked[i][0]] != ""){
+                            return visibility-1;
+                        }
+                    }
+                }
+                break;
+            case "left":
+                while(true){
+                    visibility++;
+                    for(let i = 0; i < 4; i++){
+                        if(squaresCurrentlyBeingChecked[i][0] - visibility < 0){
+                            return visibility-1;
+                        }
+                        if(playerBoardState[squaresCurrentlyBeingChecked[i][1]][squaresCurrentlyBeingChecked[i][0] - visibility] != ""){
+                            return visibility-1;
+                        }
+                    }
+                }
+                break;
+            case "right":
+                while(true){
+                    visibility++;
+                    for(let i = 0; i < 4; i++){
+                        if(squaresCurrentlyBeingChecked[i][0] + visibility > 9){
+                            return visibility-1;
+                        }
+                        if(playerBoardState[squaresCurrentlyBeingChecked[i][1]][squaresCurrentlyBeingChecked[i][0] + visibility] != ""){
+                            return visibility-1;
+                        }
+                    }
+                }
+                break;
+            default:
+                alert(`did you know that you're supposed to provide a direction for this function? ${direction} is not a valid direction.`)
+                break;
+        }
+    }
+
+    checkImmobility(){
+        return (this.checkVisibility("left")==0)&&(this.checkVisibility("right")==0)&&(this.checkVisibility("up")==0)&&(this.checkVisibility("down")==0)
+    }
+
+    renderGhost(){
+        const downVisibility = this.checkVisibility("down")
+        if(this.DOMGhost.length == 0){
+            for(let i = 0; i < 4; i++){
+                let newSquare = document.createElement("div");
+                newSquare.style.bottom = `${(this.squareCoordinates[i][1]-downVisibility) * squareSize}px`;
+                newSquare.style.left = `${this.squareCoordinates[i][0] * squareSize}px`;
+                newSquare.style.position = "absolute";
+                newSquare.className = `ghost square`
+                this.DOMGhost.push(newSquare)
+                playerBoard.appendChild(newSquare);
+            }
+        }
+        else{
+            for(let i = 0; i < 4; i++){
+                this.DOMGhost[i].style.bottom = `${(this.squareCoordinates[i][1]-downVisibility) * squareSize}px`;
+                this.DOMGhost[i].style.left = `${this.squareCoordinates[i][0] * squareSize}px`;
+                this.DOMGhost[i].style.position = "absolute";
+            }
+        }
+    }
+
+    renderCenterOfRotation(){
+        if(this.centerOfRotationDOM == ""){
+            this.centerOfRotationDOM = document.createElement("div")
+            this.centerOfRotationDOM.position = "absolute";
+            this.centerOfRotationDOM.className = "center-of-rotation";
+            playerBoard.appendChild(this.centerOfRotationDOM)
+        }
+        this.centerOfRotationDOM.style.left = `${(this.centerOfRotation[0]+1/2)*squareSize}px`;
+        this.centerOfRotationDOM.style.bottom = `${(this.centerOfRotation[1]+1/2)*squareSize}px`;
+    }
+
+    render(){
+        this.renderPiece();
+        this.renderGhost();
+        if(showCenterOfRotationOfMovingPiece){
+            this.renderCenterOfRotation();
+        }
+    }
+
+    tryToMoveLeft(){
+        if(this.checkVisibility("left")>0){
+            for(let i = 0; i < 4; i++){
+                this.squareCoordinates[i][0]--;
+            }
+            this.centerOfRotation[0]-=1;
+            this.render();
+        }   
+    }
+
+    tryToMoveRight(){
+        if(this.checkVisibility("right")>0){
+            for(let i = 0; i < 4; i++){
+                this.squareCoordinates[i][0]++;
+            }
+            this.centerOfRotation[0]+=1;
+            this.render();
+        }
+    }
+
+    DASLeft(){
+        const leftVisibility = this.checkVisibility("left");
+        this.centerOfRotation[0] -= leftVisibility;
+        for(let i = 0; i < 4; i++){
+            this.squareCoordinates[i][0]-=leftVisibility;
+        }
+        this.render();
+    }
+
+    DASRight(){
+        const rightVisibility = this.checkVisibility("right");
+        this.centerOfRotation[0] += rightVisibility;
+        for(let i = 0; i < 4; i++){
+            this.squareCoordinates[i][0]+=rightVisibility;
+        }
+        this.render();
+    }
+
+    // https://harddrop.com/wiki/SRS the kick tables are taken from here
+    tryRotation(offsetX, offsetY, CCWAngle){
+        let positionsAfterRotation = [];
+        for(let i = 0; i < 4; i++){
+            let rotatedPoint = rotatePointAroundCenter(this.squareCoordinates[i], this.centerOfRotation, CCWAngle)
+            let rotatedAndOffsetPoint = [rotatedPoint[0] + offsetX, rotatedPoint[1]+offsetY]
+            positionsAfterRotation.push(rotatedAndOffsetPoint)
+        }
+        
+        let isObstructed = false;
+        let obstructionPosition;
+        for(let i = 0; i < 4; i++){
+            if(isCellObstructed(positionsAfterRotation[i])){
+                obstructionPosition = positionsAfterRotation[i];
+                isObstructed = true;
+            }
+        }
+
+        if(!isObstructed){
+            this.squareCoordinates = positionsAfterRotation;
+            this.centerOfRotation = [this.centerOfRotation[0]+offsetX, this.centerOfRotation[1]+offsetY]
+            this.currentRotationState += CCWAngle/90;
+            this.render();
+            return true
+        }
+        return false
+    }
+
+    tryRotationTests(tests, CCWAngle){ // tests is an array of pairs [x,y] of offset coordinates.
+        for (let i = 0; i < tests.length; i++){
+            const test = tests[i];
+            if(this.tryRotation(test[0], test[1], CCWAngle)){
+                if(this.piece == "t" && CCWAngle != 180 && i == 4){
+                    this.TSTKickUsed = true;
+                }
+                return;
+            }
+        }
+    }
+
+    rotateCCW(){
+        if(this.piece == "o"){
+            return; // well technically this isn't necessary, but it's here anyway for readability
+        }
+
+        if(this.piece != "i"){
+            // j/l/s/t/z kicks
+            switch(this.currentRotationState % 4){
+                case 0:
+                    //0->L, recall: this.currentRotationState stores the number of counterclockwise turns made
+                    this.tryRotationTests(SRSJLSTZKickTable["0toL"], 90)
+                    break;
+                case 1:
+                    //L->2
+                    this.tryRotationTests(SRSJLSTZKickTable["Lto2"], 90)
+                    break;
+                case 2:
+                    //2->R
+                    this.tryRotationTests(SRSJLSTZKickTable["2toR"], 90)
+                    break;
+                case 3:
+                    //R->0
+                    this.tryRotationTests(SRSJLSTZKickTable["Rto0"], 90)
+                    break;
+            }
+        }
+        else{
+            switch(this.currentRotationState % 4){
+                case 0:
+                    //0->L, recall: this.currentRotationState stores the number of counterclockwise turns made
+                    this.tryRotationTests(SRSIKickTable["0toL"], 90)
+                    break;
+                case 1:
+                    //L->2
+                    this.tryRotationTests(SRSIKickTable["Lto2"], 90)
+                    break;
+                case 2:
+                    //2->R
+                    this.tryRotationTests(SRSIKickTable["2toR"], 90)
+                    break;
+                case 3:
+                    //R->0
+                    this.tryRotationTests(SRSIKickTable["Rto0"], 90)
+                    break;
+            }
+        }
+    }
+
+    rotateCW(){
+        if(this.piece == "o"){
+            return; // well technically this isn't necessary, but it's here anyway for readability
+        }
+
+        if(this.piece != "i"){
+            // j/l/s/t/z kicks
+            switch(this.currentRotationState % 4){
+                case 0:
+                    //0->L, recall: this.currentRotationState stores the number of counterclockwise turns made
+                    this.tryRotationTests(SRSJLSTZKickTable["0toR"], 270)
+                    break;
+                case 1:
+                    //L->2
+                    this.tryRotationTests(SRSJLSTZKickTable["Lto0"], 270)
+                    break;
+                case 2:
+                    //2->R
+                    this.tryRotationTests(SRSJLSTZKickTable["2toL"], 270)
+                    break;
+                case 3:
+                    //R->0
+                    this.tryRotationTests(SRSJLSTZKickTable["Rto2"], 270)
+                    break;
+            }
+        }
+        else{
+            switch(this.currentRotationState % 4){
+                case 0:
+                    //0->L, recall: this.currentRotationState stores the number of counterclockwise turns made
+                    this.tryRotationTests(SRSIKickTable["0toR"], 270)
+                    break;
+                case 1:
+                    //L->2
+                    this.tryRotationTests(SRSIKickTable["Lto0"], 270)
+                    break;
+                case 2:
+                    //2->R
+                    this.tryRotationTests(SRSIKickTable["2toL"], 270)
+                    break;
+                case 3:
+                    //R->0
+                    this.tryRotationTests(SRSIKickTable["Rto2"], 270)
+                    break;
+            }
+        }
+    }
+
+    rotate180(){
+        if(this.piece == "o"){
+            return; // well technically this isn't necessary, but it's here anyway for readability
+        }
+        switch(this.currentRotationState % 4){
+            case 0:
+                //0->L, recall: this.currentRotationState stores the number of counterclockwise turns made
+                this.tryRotationTests(flipKickTable["0to2"], 180)
+                break;
+            case 1:
+                //L->2
+                this.tryRotationTests(flipKickTable["LtoR"], 180)
+                break;
+            case 2:
+                //2->R
+                this.tryRotationTests(flipKickTable["2to0"], 180)
+                break;
+            case 3:
+                //R->0
+                this.tryRotationTests(flipKickTable["RtoL"], 180)
+                break;
+        }
+    }
+
+    softDrop(){
+        // implementation for infinite SDF, finite SDF not yet supported. gravity isn't even supported either.
+        const downVisibility = this.checkVisibility("down");
+        this.centerOfRotation[1] -= downVisibility;
+        for(let i = 0; i < 4; i++){
+            this.squareCoordinates[i][1]-=downVisibility;
+        }
+        this.render();
+    }
+
+    lockPiece(){
+        let rowsToCheckForClears = [];
+        let immobility = this.checkImmobility(); //has to be checked before piece is placed on board
+
+        //place piece on board
+        for(let i = 0; i < 4; i++){
+            let currentSquare = this.squareCoordinates[i]
+            playerBoardState[currentSquare[1]][currentSquare[0]] = this.piece;
+            rowsToCheckForClears.push(currentSquare[1]);
+            playerSquareManagers[currentSquare[1]][currentSquare[0]].setContents(this.piece);
+        }
+
+        rowsToCheckForClears = [...new Set(rowsToCheckForClears)]
+        
+        //spin detection
+        let spinStatus = "";
+        if(immobility){
+            spinStatus = `mini ${this.piece}-spin`;
+        }
+        if(this.piece == "t"){
+            let cornerCount = 0;
+            let centerOfRotationX = this.centerOfRotation[0]
+            let centerOfRotationY = this.centerOfRotation[1]
+            if(isCellObstructed([centerOfRotationX-1, centerOfRotationY-1])){
+                cornerCount++;
+            }
+            if(isCellObstructed([centerOfRotationX-1, centerOfRotationY+1])){
+                cornerCount++;
+            }
+            if(isCellObstructed([centerOfRotationX+1, centerOfRotationY-1])){
+                cornerCount++;
+            }
+            if(isCellObstructed([centerOfRotationX+1, centerOfRotationY+1])){
+                cornerCount++;
+            }
+            if(cornerCount >= 3){
+                spinStatus = `t-spin`;
+            }
+
+            if(this.TSTKickUsed){
+                spinStatus = `t-spin`;
+            }
+        }
+
+        //line clearing
+        let clearStatus = "";
+        let rowsCleared = [];
+        for(let i = 0; i < rowsToCheckForClears.length; i++){
+            let rowIsFull = true;
+            for(let j = 0; j < 10; j++){
+                if(!isCellObstructed(j, rowsToCheckForClears[i])){
+                    rowIsFull = false;
+                }
+            }
+            if(rowIsFull){
+                rowsCleared.push(rowsToCheckForClears[i])
+            }
+        }
+
+        switch(rowsCleared.length){
+            case 0:
+                break;
+            case 1:
+                clearStatus = "single";
+                break;
+            case 2:
+                clearStatus = "double";
+                break;
+            case 3:
+                clearStatus = "triple";
+                break;
+            case 4:
+                clearStatus = "quad";
+                break;
+            default:
+                clearStatus = "";
+                break;
+        }
+
+        if(rowsCleared.length != 0){
+            combo++;
+            if(spinStatus != "" || rowsCleared.length == 4){
+                b2b++;
+            }
+            else{
+                b2b=-1;
+            }
+        }
+        else{
+            combo=-1;
+        }
+
+        for(let row = 0; row < 29; row++){
+            let howMuchDoIHaveToLookDown = 0;
+            for(let i = 0; i < rowsCleared.length; i++){
+                if(row>rowsCleared[i]){
+                    howMuchDoIHaveToLookDown++;
+                }
+            }
+
+            for(let j = 0; j < 10; j++){
+                if(howMuchDoIHaveToLookDown > 0){
+                    playerBoardState[row-howMuchDoIHaveToLookDown][j] = playerBoardState[row][j]
+                    playerSquareManagers[row-howMuchDoIHaveToLookDown][j].setContents(playerSquareManagers[row][j].getContents())
+                }
+            }
+        }
+
+        //announce clears
+        DOMClearTextDisplay.innerText = clearStatus;
+        DOMSpinTextDisplay.innerText = spinStatus;
+        if(combo>0){
+            DOMComboTextDisplay.innerText = `combo ${combo}`;
+        }
+        else{
+            DOMComboTextDisplay.innerText = ``;
+        }
+        if(b2b>0){
+            DOMB2BTextDisplay.innerText = `b2b x${b2b}`;
+        }
+        else{
+            DOMB2BTextDisplay.innerText = ``;
+        }
+
+        this.pullFromQueue();
+    }
+
+    hardDrop(){
+        this.softDrop();
+        this.lockPiece();
+    }
+
+    pullFromQueue(){
+        const obtainedPiece = PlayerNextManager.advanceQueue();
+        this.startPlacingPiece(obtainedPiece);
+    }
+}
+
+// ----------------- FUNCTIONS ---------------------
+
+// angle in degrees instead of radians! also angle points counterclockwise!
+const rotatePointAroundCenter = (point, center, angle) =>{
+    const difference = [point[0]-center[0], point[1]-center[1]]
+    const radianAngle = angle / 180 * Math.PI
+    const rotatedDifference = [difference[0]*Math.cos(radianAngle)-difference[1]*Math.sin(radianAngle), difference[0]*Math.sin(radianAngle)+difference[1]*Math.cos(radianAngle)]
+    return [Math.round(center[0]+rotatedDifference[0]), Math.round(center[1]+rotatedDifference[1])]
+}
+
+const shuffleArray = (array)=>{
+    for (let i = array.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        let temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+    }
+    return array
+}
+
+const generateBag = ()=>{
+    return shuffleArray(["i", "j", "o", "l", "s", "t", "z"])
+}
+
+const createPlayerBoard = ()=>{
+    for(let y = 0; y < 30; y++){
+        let playerSquareManagerRow = []
+        let playerBoardStateRow = []
+        for(let x = 0; x < 10; x++){
+            playerSquareManagerRow.push(new squareManager(x, y))
+            playerBoardStateRow.push("")
+        }
+        playerSquareManagers.push(playerSquareManagerRow);
+        playerBoardState.push(playerBoardStateRow)
+    }
+}
+
+const lose = ()=>{
+    alert("you have not win! you.... DIED!!! [sic]")
+    hasDied = true;
+}
+
+const isCellObstructed = (x, y)=>{
+    if(Array.isArray(x)){
+        if(x[1] < 0 || x[1] > 29 || x[0] < 0 || x[0] > 9){
+            return true;
+        }
+        return(playerBoardState[x[1]][x[0]]!="")
+    }
+    if(x<0 || x>9 || y<0 || y>29){
+        return true;
+    }
+    return(playerBoardState[y][x]!="")
+}
+
+const hold = ()=>{
+    if(PlayerHoldManager.getHoldPiece() == "empty"){
+        PlayerHoldManager.hold(PlayerCurrentPieceManager.getCurrentPiece());
+        PlayerCurrentPieceManager.pullFromQueue();
+    }
+    else{
+        let newHoldPiece = PlayerCurrentPieceManager.getCurrentPiece();
+        PlayerCurrentPieceManager.startPlacingPiece(PlayerHoldManager.getHoldPiece());
+        PlayerHoldManager.hold(newHoldPiece);
+    }
+}
+
+
+
+// ----------------- INITIALIZATION ---------------------
+createPlayerBoard()
+
+PlayerHoldManager = new playerHoldManager()
+
+PlayerNextManager = new playerNextManager();
+
+PlayerCurrentPieceManager = new currentPieceManager();
+
+PlayerCurrentPieceManager.pullFromQueue();
+
+
+document.addEventListener("keydown", (e)=>{
+    if(e.repeat || hasDied){
+        return;
+    }
+    switch(e.key){
+        case controls.MOVE_LEFT:
+            PlayerCurrentPieceManager.tryToMoveLeft();
+            DASLeftTimeout = setTimeout(()=>PlayerCurrentPieceManager.DASLeft(), DAS)
+            break;
+        case controls.MOVE_RIGHT:
+            PlayerCurrentPieceManager.tryToMoveRight();
+            DASRightTimeout = setTimeout(()=>PlayerCurrentPieceManager.DASRight(), DAS)
+            break;
+        case controls.SOFT_DROP:
+            PlayerCurrentPieceManager.softDrop();
+            break;
+        case controls.HARD_DROP:
+            PlayerCurrentPieceManager.hardDrop();
+            break;
+        case controls.CCW:
+            PlayerCurrentPieceManager.rotateCCW();
+            break;
+        case controls.CW:
+            PlayerCurrentPieceManager.rotateCW();
+            break;
+        case controls.ROTATE180:
+            PlayerCurrentPieceManager.rotate180();
+            break;
+        case controls.HOLD:
+            hold();
+            break;
+        case "p":
+            PlayerCurrentPieceManager.pullFromQueue();
+            break;
+    }
+})
+
+
+document.addEventListener("keyup", (e)=>{
+    switch(e.key){
+        case controls.MOVE_LEFT:
+            clearTimeout(DASLeftTimeout)
+            break;
+        case controls.MOVE_RIGHT:
+            clearTimeout(DASRightTimeout)
+            break;
+        case "p":
+            PlayerCurrentPieceManager.pullFromQueue();
+            break;
+    }
+})

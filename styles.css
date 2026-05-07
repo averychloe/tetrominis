@@ -1,0 +1,104 @@
+/* i'm making each square 30x30px for now */
+
+.playfield{
+    height: 600px;
+    width: 300px;
+    position: relative;
+}
+
+.garbage-display{
+    height: 600px;
+    width: 15px;
+    background-color: #222222;
+}
+
+.square{
+    height: 30px;
+    width: 30px;
+    border: solid 1px #222222;
+}
+
+.t{
+    background-color: #d860fc;
+    z-index: 2;
+}
+
+.s{
+    background-color: #6ed651;
+    z-index: 2;
+}
+
+.i{
+    background-color: #6fe5ed;
+    z-index: 2;
+}
+
+.o{
+    background-color: #f5dd42;
+    z-index: 2;
+}
+
+.z{
+    background-color: #f54242;
+    z-index: 2;
+}
+
+.l{
+    background-color: #f79a2f;
+    z-index: 2;
+}
+
+.j{
+    background-color: #4a53f7;
+    z-index: 2;
+}
+
+.garbage{
+    background-color: #666666;
+    z-index: 2;
+}
+
+.ghost{
+    background-color: #3a3a3a;
+    z-index: 1;
+}
+
+.empty{
+    background-color: #111111;
+    z-index: 0;
+}
+
+.notshown{
+    background-color: #000000;
+    z-index: 0;
+}
+
+.noborder{
+    border: none !important;
+}
+
+.piece-container{
+    height: 90px;
+    width: 150px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+body{
+    background-color: #000000;
+}   
+
+.center-of-rotation{
+    height: 10px;
+    width: 10px;
+    background-color: white;
+    border-radius: 50%;
+    position: absolute;
+    transform: translate(-50%, 50%);
+    z-index: 3;
+}
+
+p{
+    color: white;
+}
