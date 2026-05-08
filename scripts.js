@@ -8,6 +8,9 @@ let hasDied = false;
 let combo = -1;
 let b2b = -1;
 
+let DCDLastInvoked = Date.now();
+let garbageCap = 8;
+
 const SRSJLSTZKickTable = {
     "0toL": [[0,0], [1,0], [1,1], [0,-2], [1,-2]],
     "Lto2": [[0,0], [-1,0], [-1,-1], [0,2], [-1,2]],
@@ -47,17 +50,18 @@ let DASLeftTimeout, DASRightTimeout;
 // const ARR = 0 Not implemented: ARR automatically assumed to be 0. Like, at least I play like that.
 const DAS = 100
 const DCD = 20
+const controlsPollingRate = 50; // 50 polls per second, i.e. 20ms per frame
 
 // CONTROLS
 const controls = {
-    "CCW": "a",
-    "CW": "d",
-    "ROTATE180": "w",
-    "HOLD": "s",
-    "MOVE_LEFT": "k",
-    "MOVE_RIGHT": ";",
-    "SOFT_DROP": "o",
-    "HARD_DROP": "l"
+    "CCW": {"key": "a", "held": false, "heldFrom": 0, "executedInitialAction": false},
+    "CW": {"key": "d", "held": false, "heldFrom": 0, "executedInitialAction": false},
+    "ROTATE_180": {"key": "w", "held": false, "heldFrom": 0, "executedInitialAction": false},
+    "HOLD": {"key": "s", "held": false, "heldFrom": 0, "executedInitialAction": false},
+    "MOVE_LEFT": {"key": "k", "held": false, "heldFrom": 0, "executedInitialAction": false},
+    "MOVE_RIGHT": {"key": ";", "held": false, "heldFrom": 0, "executedInitialAction": false},
+    "SOFT_DROP": {"key": "o", "held": false, "heldFrom": 0, "executedInitialAction": false},
+    "HARD_DROP": {"key": "l", "held": false, "heldFrom": 0, "executedInitialAction": false},
 }
 
 // -------------------- ELEMENTS ---------------------
@@ -66,6 +70,7 @@ const DOMSpinTextDisplay = document.getElementById("spin-text")
 const DOMClearTextDisplay = document.getElementById("clear-text")
 const DOMComboTextDisplay = document.getElementById("combo-text")
 const DOMB2BTextDisplay = document.getElementById("b2b-text")
+const DOMSpikeTextDisplay = document.getElementById("spike-text")
 
 // -------------------- CLASSES ---------------------
 class squareManager{
@@ -331,6 +336,7 @@ class currentPieceManager{
         this.centerOfRotationDOM = "";
         this.TSTKickUsed = false;
         this.currentRotationState = 0; // how many counterclockwise rotations have been applied. this is relevant for srs kicks.
+        this.lastMoveWasRotation = false;
     }
 
     getCurrentPiece(){
@@ -413,7 +419,7 @@ class currentPieceManager{
                         if(squaresCurrentlyBeingChecked[i][1] + visibility > 29){
                             return visibility-1;
                         }
-                        if(playerBoardState[squaresCurrentlyBeingChecked[i][1] + visibility][squaresCurrentlyBeingChecked[i][0]] != ""){
+                        if(isCellObstructed(squaresCurrentlyBeingChecked[i][0], squaresCurrentlyBeingChecked[i][1]+visibility)){
                             return visibility-1;
                         }
                     }
@@ -426,7 +432,7 @@ class currentPieceManager{
                         if(squaresCurrentlyBeingChecked[i][1] - visibility < 0){
                             return visibility-1;
                         }
-                        if(playerBoardState[squaresCurrentlyBeingChecked[i][1] - visibility][squaresCurrentlyBeingChecked[i][0]] != ""){
+                        if(isCellObstructed(squaresCurrentlyBeingChecked[i][0], squaresCurrentlyBeingChecked[i][1]-visibility)){
                             return visibility-1;
                         }
                     }
@@ -439,7 +445,7 @@ class currentPieceManager{
                         if(squaresCurrentlyBeingChecked[i][0] - visibility < 0){
                             return visibility-1;
                         }
-                        if(playerBoardState[squaresCurrentlyBeingChecked[i][1]][squaresCurrentlyBeingChecked[i][0] - visibility] != ""){
+                        if(isCellObstructed(squaresCurrentlyBeingChecked[i][0]-visibility, squaresCurrentlyBeingChecked[i][1])){
                             return visibility-1;
                         }
                     }
@@ -452,7 +458,7 @@ class currentPieceManager{
                         if(squaresCurrentlyBeingChecked[i][0] + visibility > 9){
                             return visibility-1;
                         }
-                        if(playerBoardState[squaresCurrentlyBeingChecked[i][1]][squaresCurrentlyBeingChecked[i][0] + visibility] != ""){
+                        if(isCellObstructed(squaresCurrentlyBeingChecked[i][0]+visibility, squaresCurrentlyBeingChecked[i][1])){
                             return visibility-1;
                         }
                     }
@@ -515,6 +521,7 @@ class currentPieceManager{
                 this.squareCoordinates[i][0]--;
             }
             this.centerOfRotation[0]-=1;
+            this.lastMoveWasRotation = false;
             this.render();
         }   
     }
@@ -525,6 +532,7 @@ class currentPieceManager{
                 this.squareCoordinates[i][0]++;
             }
             this.centerOfRotation[0]+=1;
+            this.lastMoveWasRotation = false;
             this.render();
         }
     }
@@ -535,6 +543,9 @@ class currentPieceManager{
         for(let i = 0; i < 4; i++){
             this.squareCoordinates[i][0]-=leftVisibility;
         }
+        if(leftVisibility>0){
+            this.lastMoveWasRotation = false;
+        }
         this.render();
     }
 
@@ -543,6 +554,9 @@ class currentPieceManager{
         this.centerOfRotation[0] += rightVisibility;
         for(let i = 0; i < 4; i++){
             this.squareCoordinates[i][0]+=rightVisibility;
+        }
+        if(rightVisibility>0){
+            this.lastMoveWasRotation = false;
         }
         this.render();
     }
@@ -569,6 +583,7 @@ class currentPieceManager{
             this.squareCoordinates = positionsAfterRotation;
             this.centerOfRotation = [this.centerOfRotation[0]+offsetX, this.centerOfRotation[1]+offsetY]
             this.currentRotationState += CCWAngle/90;
+            this.lastMoveWasRotation=true;
             this.render();
             return true
         }
@@ -714,12 +729,17 @@ class currentPieceManager{
         for(let i = 0; i < 4; i++){
             this.squareCoordinates[i][1]-=downVisibility;
         }
+        if(downVisibility>0){
+            this.lastMoveWasRotation = false;
+        }
         this.render();
     }
 
-    lockPiece(){
+    lockPiece(){ // some of the code in this function could definitely be put in functions of their own.
         let rowsToCheckForClears = [];
         let immobility = this.checkImmobility(); //has to be checked before piece is placed on board
+        let baseAttack = 0;
+        let comboWeightedAttack = 0;
 
         //place piece on board
         for(let i = 0; i < 4; i++){
@@ -732,32 +752,54 @@ class currentPieceManager{
         rowsToCheckForClears = [...new Set(rowsToCheckForClears)]
         
         //spin detection
-        let spinStatus = "";
+        let displayedSpinStatus = "";
+        let shortSpinStatus = "";
         if(immobility){
-            spinStatus = `mini ${this.piece}-spin`;
+            displayedSpinStatus = `mini ${this.piece}-spin`;
         }
-        if(this.piece == "t"){
+        if(this.piece == "t" && this.lastMoveWasRotation){
             let cornerCount = 0;
+            let cornersFaced = 0;
             let centerOfRotationX = this.centerOfRotation[0]
             let centerOfRotationY = this.centerOfRotation[1]
+
+            //very inelegant method of checking the 2-corner mini detection
+
             if(isCellObstructed([centerOfRotationX-1, centerOfRotationY-1])){
                 cornerCount++;
+                if(this.currentRotationState%4 == 1 || this.currentRotationState%4 == 2){
+                    cornersFaced++;
+                }
             }
             if(isCellObstructed([centerOfRotationX-1, centerOfRotationY+1])){
                 cornerCount++;
+                if(this.currentRotationState%4 == 0 || this.currentRotationState%4 == 1){
+                    cornersFaced++;
+                }
             }
             if(isCellObstructed([centerOfRotationX+1, centerOfRotationY-1])){
                 cornerCount++;
+                if(this.currentRotationState%4 == 2 || this.currentRotationState%4 == 3){
+                    cornersFaced++;
+                }
             }
             if(isCellObstructed([centerOfRotationX+1, centerOfRotationY+1])){
                 cornerCount++;
+                if(this.currentRotationState%4 == 3 || this.currentRotationState%4 == 0){
+                    cornersFaced++;
+                }
             }
             if(cornerCount >= 3){
-                spinStatus = `t-spin`;
+                displayedSpinStatus = `mini t-spin`;
+                if(cornersFaced == 2){
+                    displayedSpinStatus = `t-spin`;
+                    shortSpinStatus = "spin";
+                }
             }
 
             if(this.TSTKickUsed){
-                spinStatus = `t-spin`;
+                displayedSpinStatus = `t-spin`;
+                shortSpinStatus = "spin";
             }
         }
 
@@ -781,15 +823,36 @@ class currentPieceManager{
                 break;
             case 1:
                 clearStatus = "single";
+                if(shortSpinStatus == "spin"){
+                    baseAttack = 2;
+                }
                 break;
             case 2:
                 clearStatus = "double";
+                if(shortSpinStatus == "spin"){
+                    baseAttack = 4;
+                }
+                else{
+                    baseAttack = 1;
+                }
                 break;
             case 3:
                 clearStatus = "triple";
+                if(shortSpinStatus == "spin"){
+                    baseAttack = 6;
+                }
+                else{
+                    baseAttack = 2;
+                }
                 break;
             case 4:
                 clearStatus = "quad";
+                if(shortSpinStatus == "spin"){
+                    baseAttack = 8;
+                }
+                else{
+                    baseAttack = 4;
+                }
                 break;
             default:
                 clearStatus = "";
@@ -798,8 +861,10 @@ class currentPieceManager{
 
         if(rowsCleared.length != 0){
             combo++;
-            if(spinStatus != "" || rowsCleared.length == 4){
-                b2b++;
+            if(displayedSpinStatus != "" || rowsCleared.length == 4){
+                b2b++; if(b2b > 0){
+                    baseAttack += 1;
+                }
             }
             else{
                 b2b=-1;
@@ -807,6 +872,13 @@ class currentPieceManager{
         }
         else{
             combo=-1;
+        }
+
+        if(baseAttack == 0 && combo > 1){
+            comboWeightedAttack = downRNGRound(Math.log(1+1.25*combo))
+        }
+        if(baseAttack > 0){
+            comboWeightedAttack = downRNGRound(baseAttack*(1+0.25*combo))
         }
 
         for(let row = 0; row < 29; row++){
@@ -827,7 +899,8 @@ class currentPieceManager{
 
         //announce clears
         DOMClearTextDisplay.innerText = clearStatus;
-        DOMSpinTextDisplay.innerText = spinStatus;
+        DOMSpinTextDisplay.innerText = displayedSpinStatus;
+        DOMSpikeTextDisplay.innerText = comboWeightedAttack;
         if(combo>0){
             DOMComboTextDisplay.innerText = `combo ${combo}`;
         }
@@ -854,6 +927,8 @@ class currentPieceManager{
         this.startPlacingPiece(obtainedPiece);
     }
 }
+
+
 
 // ----------------- FUNCTIONS ---------------------
 
@@ -922,7 +997,29 @@ const hold = ()=>{
     }
 }
 
+const pollForMovement = ()=>{
+    //DAS actions
+    if(Date.now() - DCDLastInvoked >= DCD){
+        if(controls.SOFT_DROP.held && Date.now()-controls.SOFT_DROP.heldFrom >= DAS){
+            PlayerCurrentPieceManager.softDrop();
+        }
+        if(controls.MOVE_LEFT.held && Date.now()-controls.MOVE_LEFT.heldFrom >= DAS){
+            PlayerCurrentPieceManager.DASLeft();
+        }
+        if(controls.MOVE_RIGHT.held && Date.now()-controls.MOVE_RIGHT.heldFrom >= DAS){
+            PlayerCurrentPieceManager.DASRight();
+        }
+    }
+}
 
+const downRNGRound = (x)=>{
+    const result = Math.random()<(x-Math.floor(x))?Math.ceil(x):Math.floor(x);
+    return result;
+}
+
+const randomIntegerBetween = (lowerBound, upperBound)=>{
+    return Math.floor(Math.random()*(upperBound-lowerBound)+lowerBound)
+}
 
 // ----------------- INITIALIZATION ---------------------
 createPlayerBoard()
@@ -940,50 +1037,53 @@ document.addEventListener("keydown", (e)=>{
     if(e.repeat || hasDied){
         return;
     }
+    for(const [pairKey, value] of Object.entries(controls)){
+        if(e.key == value.key){
+            controls[pairKey].held = true;
+            controls[pairKey].heldFrom = Date.now();
+        }
+    }
     switch(e.key){
-        case controls.MOVE_LEFT:
-            PlayerCurrentPieceManager.tryToMoveLeft();
-            DASLeftTimeout = setTimeout(()=>PlayerCurrentPieceManager.DASLeft(), DAS)
-            break;
-        case controls.MOVE_RIGHT:
-            PlayerCurrentPieceManager.tryToMoveRight();
-            DASRightTimeout = setTimeout(()=>PlayerCurrentPieceManager.DASRight(), DAS)
-            break;
-        case controls.SOFT_DROP:
-            PlayerCurrentPieceManager.softDrop();
-            break;
-        case controls.HARD_DROP:
-            PlayerCurrentPieceManager.hardDrop();
-            break;
-        case controls.CCW:
+        default:
+            DCDLastInvoked = Date.now();
+        case controls["CCW"].key:
             PlayerCurrentPieceManager.rotateCCW();
             break;
-        case controls.CW:
+        case controls["CW"].key:
             PlayerCurrentPieceManager.rotateCW();
-            break;
-        case controls.ROTATE180:
+            break;  
+        case controls["ROTATE_180"].key:
             PlayerCurrentPieceManager.rotate180();
             break;
-        case controls.HOLD:
-            hold();
+        case controls["MOVE_LEFT"].key:
+            PlayerCurrentPieceManager.tryToMoveLeft();
+            setTimeout(()=>{if(controls["MOVE_LEFT"].held){PlayerCurrentPieceManager.DASLeft()}}, DAS)
             break;
-        case "p":
-            PlayerCurrentPieceManager.pullFromQueue();
+        case controls["MOVE_RIGHT"].key:
+            PlayerCurrentPieceManager.tryToMoveRight();
+            setTimeout(()=>{if(controls["MOVE_RIGHT"].held){PlayerCurrentPieceManager.DASRight()}}, DAS)
+            break;
+        case controls["SOFT_DROP"].key:
+            PlayerCurrentPieceManager.softDrop();
+            break;
+        case controls["HARD_DROP"].key:
+            PlayerCurrentPieceManager.hardDrop();
+            break;
+        case controls["HOLD"].key:
+            hold();
             break;
     }
 })
 
 
 document.addEventListener("keyup", (e)=>{
-    switch(e.key){
-        case controls.MOVE_LEFT:
-            clearTimeout(DASLeftTimeout)
-            break;
-        case controls.MOVE_RIGHT:
-            clearTimeout(DASRightTimeout)
-            break;
-        case "p":
-            PlayerCurrentPieceManager.pullFromQueue();
-            break;
+    for(const [pairKey, value] of Object.entries(controls)){
+        if(e.key == value.key){
+            controls[pairKey].held = false;
+        }
     }
 })
+
+setInterval(pollForMovement, controlsPollingRate)
+
+//JS can perform roughly on the order of 1 billion operations per second. That's... not a lot.
