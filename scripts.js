@@ -42,7 +42,7 @@ const flipKickTable = {
 
 let playerBoardState = []
 let playerSquareManagers = []
-let PlayerHoldManager, PlayerNextManager, PlayerCurrentPieceManager;
+let PlayerHoldManager, PlayerNextManager, PlayerCurrentPieceManager, PlayerGarbageManager;
 let DASLeftTimeout, DASRightTimeout;
 
 // HANDLING
@@ -71,6 +71,7 @@ const DOMClearTextDisplay = document.getElementById("clear-text")
 const DOMComboTextDisplay = document.getElementById("combo-text")
 const DOMB2BTextDisplay = document.getElementById("b2b-text")
 const DOMSpikeTextDisplay = document.getElementById("spike-text")
+const DOMPlayerGarbageDisplay = document.getElementById("player-garbage-display")
 
 // -------------------- CLASSES ---------------------
 class squareManager{
@@ -881,7 +882,14 @@ class currentPieceManager{
             comboWeightedAttack = downRNGRound(baseAttack*(1+0.25*combo))
         }
 
-        for(let row = 0; row < 29; row++){
+        if(rowsCleared.length != 0){
+            comboWeightedAttack = PlayerGarbageManager.cancelGarbage(comboWeightedAttack)
+        }
+        else{
+            PlayerGarbageManager.placeGarbageOnBoard();
+        }
+
+        for(let row = 0; row < 30; row++){
             let howMuchDoIHaveToLookDown = 0;
             for(let i = 0; i < rowsCleared.length; i++){
                 if(row>rowsCleared[i]){
@@ -928,7 +936,88 @@ class currentPieceManager{
     }
 }
 
+class playerGarbageManager{
+    constructor(){
+        this.garbageQueue = [];
+    }
 
+    receiveGarbage(amount){
+        this.garbageQueue.push({"amount": amount, "column": randomIntegerBetween(0,9)})
+        this.render();
+    }
+
+    cancelGarbage(amountToBeCancelled){
+        let attackLeft = amountToBeCancelled;
+        while(attackLeft > 0){
+            if(this.garbageQueue.length==0){
+                this.render();
+                return(attackLeft);
+            }
+            if(this.garbageQueue[0].amount <= attackLeft){
+                attackLeft -= this.garbageQueue[0].amount;
+                this.garbageQueue.shift();
+            }
+            else{
+                this.garbageQueue[0].amount -= attackLeft;
+                attackLeft = 0;
+            }
+        }
+        this.render();
+        return(0);
+    }
+
+    placeSpecificLinesOnBoard(numberOfLines, column){
+        const oldBoardState = JSON.parse(JSON.stringify(playerBoardState));
+        for(let y = numberOfLines; y < 30; y++){
+            for(let x = 0; x < 10; x++){
+                playerBoardState[y][x] = oldBoardState[y-numberOfLines][x]
+                playerSquareManagers[y][x].setContents(oldBoardState[y-numberOfLines][x])
+            }
+            console.log(y, oldBoardState)
+        }
+        for(let y = 0; y < numberOfLines; y++){
+            for(let x = 0; x < 10; x++){
+                playerBoardState[y][x] = x==column ? "" : "garbage"
+                playerSquareManagers[y][x].setContents(x==column ? "empty" : "garbage")
+            }
+        }
+    }
+
+    placeGarbageOnBoard(){
+        let linesLeftToPlace = garbageCap;
+        while(linesLeftToPlace > 0){
+            if(this.garbageQueue.length==0){
+                return;
+            }
+            if(this.garbageQueue[0].amount <= linesLeftToPlace){
+                this.placeSpecificLinesOnBoard(this.garbageQueue[0].amount, this.garbageQueue[0].column)
+                linesLeftToPlace -= this.garbageQueue[0].amount;
+                this.garbageQueue.shift();
+            }
+            else{
+                this.placeSpecificLinesOnBoard(linesLeftToPlace, this.garbageQueue[0].column)
+                this.garbageQueue[0].amount -= linesLeftToPlace;
+                linesLeftToPlace = 0;
+            }
+        }
+        this.render();
+    }
+
+    render(){
+        DOMPlayerGarbageDisplay.innerHTML = "";
+
+        let heightOfCurrentGarbageWarning = 0;
+        for(let i = 0; i < this.garbageQueue.length; i++){
+            let newGarbageWarning = document.createElement("div");
+            newGarbageWarning.className = "garbage-warning";
+            newGarbageWarning.style.height = `${this.garbageQueue[i].amount * squareSize}px`;
+            newGarbageWarning.style.bottom = `${heightOfCurrentGarbageWarning}px`;
+            DOMPlayerGarbageDisplay.appendChild(newGarbageWarning);
+
+            heightOfCurrentGarbageWarning += this.garbageQueue[i].amount * squareSize;
+        }
+    }
+}
 
 // ----------------- FUNCTIONS ---------------------
 
@@ -1030,6 +1119,8 @@ PlayerNextManager = new playerNextManager();
 
 PlayerCurrentPieceManager = new currentPieceManager();
 
+PlayerGarbageManager = new playerGarbageManager();
+
 PlayerCurrentPieceManager.pullFromQueue();
 
 
@@ -1071,6 +1162,15 @@ document.addEventListener("keydown", (e)=>{
             break;
         case controls["HOLD"].key:
             hold();
+            break;
+        case "3":
+            PlayerGarbageManager.receiveGarbage(3);
+            break;
+        case "6":
+            PlayerGarbageManager.receiveGarbage(6);
+            break;
+        case "9":
+            PlayerGarbageManager.receiveGarbage(9);
             break;
     }
 })
