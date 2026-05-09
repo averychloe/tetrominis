@@ -5,6 +5,7 @@ let firstGameStarted = false;
 let columnLabelling = false;
 
 const showCenterOfRotationOfMovingPiece = true;
+let labelOpacity = 0.5;
 let hasDied = false;
 
 let combo = -1;
@@ -130,6 +131,7 @@ class squareManager{
         if(this.label != ""){
             let label = document.createElement("p");
             label.innerHTML = this.label;
+            label.style.opacity = labelOpacity;
             this.DOMSquare.appendChild(label);
         }
         switch(this.contains){
@@ -1479,7 +1481,8 @@ const saveSettingsToLocalStorage = ()=>{
     localStorage.setItem("survivalTimeBetweenAttacks", survivalTimeBetweenAttacks)
     localStorage.setItem("survivalInitialAPM", survivalInitialAPM)
     localStorage.setItem("survivalAPMIncrease", survivalAPMIncrease)
-
+    localStorage.setItem("columnLabelling", columnLabelling ? "true" : "false")
+    localStorage.setItem("labelOpacity", labelOpacity)
 }
 
 const getSettingsFromLocalStorage = ()=>{
@@ -1499,6 +1502,11 @@ const getSettingsFromLocalStorage = ()=>{
     survivalTimeBetweenAttacks = localStorage.getItem("survivalTimeBetweenAttacks")
     survivalInitialAPM = localStorage.getItem("survivalInitialAPM")
     survivalAPMIncrease = localStorage.getItem("survivalAPMIncrease")
+
+    columnLabelling = localStorage.getItem("columnLabelling") == "true";
+    document.getElementById("column-labelling").checked = columnLabelling;
+    labelOpacity = parseFloat(localStorage.getItem("labelOpacity"));
+    document.getElementById("label-opacity").value = labelOpacity;
 }
 
 const displaySettings = ()=>{
@@ -1683,6 +1691,9 @@ document.addEventListener("keydown", (e)=>{
 })
 document.getElementById("column-labelling").addEventListener("change", ()=>{
     columnLabelling = document.getElementById("column-labelling").value;
+})
+document.getElementById("label-opacity").addEventListener("change", ()=>{
+    labelOpacity = document.getElementById("label-opacity").value;
 })
 
 if(!(localStorage.getItem("CCW") === null)){
