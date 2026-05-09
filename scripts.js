@@ -2,6 +2,7 @@
 const squareSize = 30
 let previewLength = 5
 let firstGameStarted = false;
+let columnLabelling = false;
 
 const showCenterOfRotationOfMovingPiece = true;
 let hasDied = false;
@@ -114,6 +115,7 @@ class squareManager{
     constructor(x, y){
         this.x = x;
         this.y = y;
+        this.label = "";
         this.contains = "empty";
         this.DOMSquare = document.createElement("div");
         this.DOMSquare.style.bottom = `${y * squareSize}px`;
@@ -124,6 +126,12 @@ class squareManager{
     }
 
     refresh(){
+        this.DOMSquare.innerHTML = "";
+        if(this.label != ""){
+            let label = document.createElement("p");
+            label.innerHTML = this.label;
+            this.DOMSquare.appendChild(label);
+        }
         switch(this.contains){
             case "empty":
                 this.DOMSquare.className = this.y < 20 ? "empty square" : "notshown noborder square";
@@ -160,6 +168,11 @@ class squareManager{
 
     setContents(type){
         this.contains = type;
+        this.refresh();
+    }
+
+    setLabel(label){
+        this.label = label;
         this.refresh();
     }
 
@@ -1014,6 +1027,8 @@ class currentPieceManager{
         }
         allClear = boardIsEmpty();
 
+        i_winPieceLabellings();
+
         comboWeightedAttack += surgeBreak + (allClear ? 5 : 0);
         totalAttackSent += comboWeightedAttack;
 
@@ -1163,6 +1178,7 @@ class playerGarbageManager{
                 playerSquareManagers[y][x].setContents(x==column ? "empty" : "garbage")
             }
         }
+        i_winPieceLabellings();
     }
 
     placeGarbageOnBoard(){
@@ -1505,6 +1521,37 @@ const displaySettings = ()=>{
     document.getElementById("survival-apm-increase").value = survivalAPMIncrease;
 }
 
+const i_winPieceLabellings = ()=>{
+    if(!columnLabelling){
+        return;
+    }
+
+    for(let x=0; x<10; x++){
+        for(let y=0; y<30; y++){
+            playerSquareManagers[y][x].setLabel("");
+        }
+    }
+
+    for(let x = 0; x < 10; x++){
+        let highestPointOfColumn = 0;
+        for(let y = 29; y >= 0; y--){
+            highestPointOfColumn = y;
+            if(isCellObstructed(x, y)){
+                break;
+            }
+            if(y==0){
+                if(isCellObstructed(x,y)){
+                    highestPointOfColumn = 0;
+                }
+                else{
+                    highestPointOfColumn = -1;
+                }
+            }
+        }
+        playerSquareManagers[highestPointOfColumn+1][x].setLabel(`${x+1}`)
+    }
+}
+
 // ----------------- INITIALIZATION ---------------------
 
 let pollingInterval, windupInterval, opponentLinesSent;
@@ -1525,6 +1572,7 @@ const onKeyDown = (e)=>{
     switch(e.key){
         default:
             DCDLastInvoked = Date.now();
+            break;
         case controls["CCW"].key:
             PlayerCurrentPieceManager.rotateCCW();
             break;
@@ -1612,6 +1660,8 @@ const startFirstGame = ()=>{
 
     newGame();
 
+    addColumnNumbering();
+
     if(ARR != 0){
         requestAnimationFrame(pollForMovement)
     }
@@ -1628,14 +1678,19 @@ const resetOrStartGame = ()=>{
 
 document.getElementById("start-game").addEventListener("mousedown", resetOrStartGame)
 document.getElementById("submit").addEventListener("mousedown", importSettings)
-document.addEventListener("keypress", (e)=>{
+document.addEventListener("keydown", (e)=>{
     console.log(e.key)
     if(e.key == "Enter"){
         resetOrStartGame();
     }
 })
+document.getElementById("column-labelling").addEventListener("change", ()=>{
+    columnLabelling = document.getElementById("column-labelling").value;
+})
 
 if(!(localStorage.getItem("CCW") === null)){
+    console.log("a")
     getSettingsFromLocalStorage();
     displaySettings();
 }
+

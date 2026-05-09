@@ -16,6 +16,13 @@
     height: 30px;
     width: 30px;
     border: solid 1px #222222;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.square p{
+    opacity: 0.3;
 }
 
 .t{
@@ -59,7 +66,7 @@
 }
 
 .ghost{
-    background-color: #3a3a3a;
+    background-color: #3a3a3a77;
     z-index: 1;
 }
 
@@ -88,6 +95,7 @@
 body{
     background-color: #000000;
     color: white;
+    font-family: monospace;
 }   
 
 .center-of-rotation{
