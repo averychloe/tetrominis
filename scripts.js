@@ -667,10 +667,6 @@ class currentPieceManager{
             this.lastMoveWasRotation=true;
             this.render();
 
-            if(this.checkImmobility()){
-                SFX.spin.play()
-            }
-
             return true
         }
         return false
@@ -814,11 +810,7 @@ class currentPieceManager{
         DCDLastInvoked = Date.now();
     }
 
-    softDrop(sfx=true){
-        if(sfx){
-            SFX.softdrop.play()
-        }
-
+    softDrop(){
         // implementation for infinite SDF, finite SDF not yet supported. gravity isn't even supported either.
         const downVisibility = this.checkVisibility("down");
         this.centerOfRotation[1] -= downVisibility;
@@ -1055,7 +1047,7 @@ class currentPieceManager{
 
 
         //announce clears
-        DOMClearTextDisplay.innerText = clearStatus + (allClear ? "ALL CLEAR" : "");
+        DOMClearTextDisplay.innerText = clearStatus + (allClear ? " ALL CLEAR" : "");
         DOMSpinTextDisplay.innerText = displayedSpinStatus;
         if(combo>0){
             DOMComboTextDisplay.innerText = `combo ${combo}`;
@@ -1074,8 +1066,7 @@ class currentPieceManager{
     }
 
     hardDrop(){
-        SFX.harddrop.play()
-        this.softDrop(0);
+        this.softDrop();
         this.lockPiece();
     }
 
@@ -1335,10 +1326,13 @@ const pollForMovement = ()=>{
             }
             
         }
+        if(controls.SOFT_DROP.held && Date.now()-controls.SOFT_DROP.heldFrom >= DAS){
+            PlayerCurrentPieceManager.softDrop();
+        }
     }
 
     const timeElapsed = Date.now() - gameStartedAt;
-    DOMTimeDisplay.innerText = `time elapsed: ${formatTimeDifference(timeElapsed)}`
+    DOMTimeDisplay.innerText = `time: ${formatTimeDifference(timeElapsed)}`
     DOMPPSDisplay.innerText = `pieces: ${totalPiecesPlaced} (${roundToTwoPlaces(totalPiecesPlaced / (timeElapsed / 1000))}/s)`
     DOMAPMDisplay.innerText = `attack: ${totalAttackSent} (${roundToTwoPlaces(totalAttackSent / (timeElapsed / 60000))}/m)`
     DOMAPPDisplay.innerText = `app: ${roundToTwoPlaces(totalAttackSent / totalPiecesPlaced)}`
@@ -1408,9 +1402,12 @@ const tryWindup = ()=>{
         chunks.push(amountRemaining);
     }
 
-    for(let i = 0; i < chunks.length; i++){
-        PlayerGarbageManager.receiveGarbage(chunks[i]);
-    }
+    setTimeout(()=>{
+        for(let i = 0; i < chunks.length; i++){
+            PlayerGarbageManager.receiveGarbage(chunks[i]);
+        }
+    }, 1000)
+
     switch(windupType){
         case 1:
             SFX.windup1.play();
