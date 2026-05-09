@@ -1326,12 +1326,21 @@ const pollForMovement = ()=>{
     //DAS actions
     if(Date.now() - DCDLastInvoked >= DCD){
         if(ARR==0){
-            if(controls.MOVE_LEFT.held && Date.now()-controls.MOVE_LEFT.heldFrom >= DAS){
+            if(controls.MOVE_LEFT.held && Date.now()-controls.MOVE_LEFT.heldFrom >= DAS && !controls.MOVE_RIGHT.held){
                 PlayerCurrentPieceManager.DASLeft();
             }
-            if(controls.MOVE_RIGHT.held && Date.now()-controls.MOVE_RIGHT.heldFrom >= DAS){
+            if(controls.MOVE_RIGHT.held && Date.now()-controls.MOVE_RIGHT.heldFrom >= DAS && !controls.MOVE_LEFT.held){
                 PlayerCurrentPieceManager.DASRight();
             }
+            if(controls.MOVE_LEFT.held && controls.MOVE_RIGHT.held && Date.now()-controls.MOVE_LEFT.heldFrom >= DAS){
+                if(controls.MOVE_LEFT.heldFrom > controls.MOVE_RIGHT.heldFrom){
+                    PlayerCurrentPieceManager.DASLeft();
+                }
+                else{
+                    PlayerCurrentPieceManager.DASRight();
+                }
+            }
+
         }
         else{
             if(controls.MOVE_LEFT.held && Date.now()-controls.MOVE_LEFT.heldFrom >= DAS && Date.now()-ARRLastInvoked >= ARR){
@@ -1591,11 +1600,13 @@ const onKeyDown = (e)=>{
             break;
         case controls["MOVE_LEFT"].key:
             PlayerCurrentPieceManager.tryToMoveLeft();
-            setTimeout(()=>{if(controls["MOVE_LEFT"].held && ARR==0){PlayerCurrentPieceManager.DASLeft()}}, DAS)
+            controls.MOVE_LEFT.heldFrom = Date.now()
+            setTimeout(()=>{if(controls["MOVE_LEFT"].held && ARR==0 && controls.MOVE_LEFT.heldFrom > controls.MOVE_RIGHT.heldFrom){PlayerCurrentPieceManager.DASLeft()}}, DAS)
             break;
         case controls["MOVE_RIGHT"].key:
             PlayerCurrentPieceManager.tryToMoveRight();
-            setTimeout(()=>{if(controls["MOVE_RIGHT"].held && ARR==0){PlayerCurrentPieceManager.DASRight()}}, DAS)
+            controls.MOVE_RIGHT.heldFrom = Date.now()
+            setTimeout(()=>{if(controls["MOVE_RIGHT"].held && ARR==0 && controls.MOVE_LEFT.heldFrom < controls.MOVE_RIGHT.heldFrom){PlayerCurrentPieceManager.DASRight()}}, DAS)
             break;
         case controls["SOFT_DROP"].key:
             PlayerCurrentPieceManager.softDrop();
