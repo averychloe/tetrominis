@@ -1659,8 +1659,6 @@ const startFirstGame = ()=>{
 
     newGame();
 
-    addColumnNumbering();
-
     if(ARR != 0){
         requestAnimationFrame(pollForMovement)
     }
@@ -1671,7 +1669,8 @@ const resetOrStartGame = ()=>{
         newGame();
     }
     else{
-        startFirstGame(); firstGameStarted = true;
+        firstGameStarted = true;
+        startFirstGame();
     }
 }
 
