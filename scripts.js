@@ -1516,6 +1516,9 @@ const onKeyDown = (e)=>{
     if(e.repeat){
         return;
     }
+    if(hasDied){
+        return;
+    }
     for(const [pairKey, value] of Object.entries(controls)){
         if(e.key == value.key){
             controls[pairKey].held = true;
