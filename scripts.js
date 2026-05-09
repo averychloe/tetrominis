@@ -1635,5 +1635,7 @@ document.addEventListener("keypress", (e)=>{
     }
 })
 
-getSettingsFromLocalStorage();
-displaySettings();
+if(!(localStorage.getItem("CCW") === null)){
+    getSettingsFromLocalStorage();
+    displaySettings();
+}
