@@ -1395,7 +1395,6 @@ const tryWindup = ()=>{
     survivalInitialAPM = parseInt(survivalInitialAPM);
 
     let targetAmount = ((survivalInitialAPM + survivalAPMIncrease*(Date.now()-gameStartedAt)/60000) / (60000 / survivalTimeBetweenAttacks)) / 1.5;
-    console.log(typeof(survivalInitialAPM));
     let actualAmount = downRNGRound(targetAmount * (randomIntegerBetween(10,20)/10))
     let amountRemaining = actualAmount;
     opponentLinesSent += actualAmount;
@@ -1679,7 +1678,6 @@ const resetOrStartGame = ()=>{
 document.getElementById("start-game").addEventListener("mousedown", resetOrStartGame)
 document.getElementById("submit").addEventListener("mousedown", importSettings)
 document.addEventListener("keydown", (e)=>{
-    console.log(e.key)
     if(e.key == "Enter"){
         resetOrStartGame();
     }
@@ -1689,7 +1687,6 @@ document.getElementById("column-labelling").addEventListener("change", ()=>{
 })
 
 if(!(localStorage.getItem("CCW") === null)){
-    console.log("a")
     getSettingsFromLocalStorage();
     displaySettings();
 }
