@@ -7,37 +7,92 @@
     <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-    <div id="playfield-container" style="display: flex; position: absolute; top: 50vh; left: 50vw; transform: translate(-50%, -50%);">
-        <div id="player-hold-and-text-container" style="display:flex; flex-direction: column; width: 150px;">
-            <div id="player-hold-text" style="background-color: white; height: 20px;">
-                <p style="margin: 0px; margin-left: 5px;">hold</p>
-            </div>
-            <div id="player-hold" style="height: 90px; background-color: #333; display: flex; justify-content: center; align-items: center;">
-            
-            </div>
-            <div>
-                <p id="spin-text"> </p>
-                <p id="clear-text" style="font-size: 3em; margin: 5px;"> </p>
-                <p id="combo-text" style="font-size: 2em; margin: 5px;"> </p>
-                <p id="b2b-text" style="font-size: 2em; margin: 5px;"> </p>
-                <p id="spike-text" style="font-size: 5em; margin: 5px;"></p>
-            </div>
-        </div>
-        <div id="player-garbage-display" class="garbage-display" style="align-self: flex-end; position:relative;">
+        <div id="playfield-container" style="display: flex; position: absolute; top: 50vh; left: 50vw; transform: translate(-50%, -50%);">
+            <div id="player-hold-and-text-container" style="display:flex; flex-direction: column; width: 150px; height: 600px;">
+                <div id="player-hold-text" style="background-color: white; height: 20px;">
+                    <p style="margin: 0px; margin-left: 5px;">hold</p>
+                </div>
+                <div id="player-hold" style="height: 90px; background-color: #333; display: flex; justify-content: center; align-items: center;">
+                
+                </div>
+                <div>
+                    <p id="spin-text"> </p>
+                    <p id="clear-text" style="font-size: 3em; margin: 5px;"> </p>
+                    <p id="combo-text" style="font-size: 2em; margin: 5px;"> </p>
+                    <p id="b2b-text" style="font-size: 2em; margin: 5px;"> </p>
+                    
+                </div>
 
-        </div>
-        <div id="player-playfield" class="playfield">
-        </div>
-        <div id="player-next-container" style="display:flex; flex-direction: column; width: 150px;">
-            <div id="player-next-text" style="background-color: white; height: 20px;">
-                <p style="margin: 0px; margin-left: 5px;">next</p>
+                <div style="position: absolute; bottom: 0px;">
+                    <p id="spike-text" style="font-size: 5em; margin: 5px;"></p>
+                    <p id="time-text"> </p>
+                    <p id="pps-text" style="font-size: 1em; margin: 5px;"> </p>
+                    <p id="apm-text" style="font-size: 1em; margin: 5px;"> </p>
+                    <p id="app-text" style="font-size: 1em; margin: 5px;"> </p>
+                    <p id="vs-text" style="font-size: 1em; margin: 5px;"> </p>
+                </div>
             </div>
-            <div id="player-next" style="height: 450px; background-color: #333; display:flex; flex-direction: column;">
-            
+            <div id="player-garbage-display" class="garbage-display" style="align-self: flex-end; position:relative;">
+
+            </div>
+            <div id="player-playfield" class="playfield">
+            </div>
+            <div id="player-next-container" style="display:flex; flex-direction: column; width: 150px;">
+                <div id="player-next-text" style="background-color: white; height: 20px;">
+                    <p style="margin: 0px; margin-left: 5px;">next</p>
+                </div>
+                <div id="player-next" style="height: 450px; background-color: #333; display:flex; flex-direction: column;">
+                
+                </div>
             </div>
         </div>
+
+        <div id="opponent">
+            <p id="opponent-apm"></p>
+        </div>
+    
+    <div id="settings" style="z-index: 10; pointer-events: all;">
+        <h1> controls: </h1>
+        <p>Yes, you will have to type the key codes into the input fields, <br> since I'm too lazy to implement actual key inputs.</p>
+        <div id="controls">
+            <label for="controls-ccw">Rotate counterclockwise: </label>
+            <input type="text" id="controls-ccw"> <br>
+            <label for="controls-cw">Rotate clockwise: </label>
+            <input type="text" id="controls-cw"> <br>
+            <label for="controls-180">Rotate 180: </label>
+            <input type="text" id="controls-180"> <br>
+            <label for="controls-left">Move left: </label>
+            <input type="text" id="controls-left"> <br>
+            <label for="controls-right">Move right: </label>
+            <input type="text" id="controls-right"> <br>
+            <label for="controls-sd">Soft drop: </label>
+            <input type="text" id="controls-sd"> <br>
+            <label for="controls-hd">Hard drop: </label>
+            <input type="text" id="controls-hd"> <br>
+            <label for="controls-hold">Hold: </label>
+            <input type="text" id="controls-hold"> <br>
+        </div>
+        <h1> handling: </h1>
+        <div id="handling">
+            <label for="handling-arr">ARR: </label>
+            <input type="number" id="handling-arr"> <br>
+            <label for="handling-das">DAS: </label>
+            <input type="number" id="handling-das"> <br>
+            <label for="handling-dcd">DCD: </label>
+            <input type="number" id="handling-dcd"> <br>
+        </div>
+        <h1> survival settings: </h1>
+        <div id="survival">
+            <label for="survival-time-between-attacks">Amount of time between attacks: </label>
+            <input type="number" id="survival-time-between-attacks"> <br>
+            <label for="survival-initial-apm">Initial APM: </label>
+            <input type="number" id="survival-initial-apm"> <br>
+            <label for="survival-apm-increase">APM increase per minute: </label>
+            <input type="number" id="survival-apm-increase"> <br>
+        </div>
+        <button id="submit"> Submit settings </button>
+        <button id="start-game"> Start game (or press Enter) </button>
     </div>
-
     
     
     <script src="./scripts.js"></script>

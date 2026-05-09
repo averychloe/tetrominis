@@ -1,6 +1,7 @@
 // ------------------- VARIABLES---------------------
 const squareSize = 30
 let previewLength = 5
+let firstGameStarted = false;
 
 const showCenterOfRotationOfMovingPiece = true;
 let hasDied = false;
@@ -9,7 +10,7 @@ let combo = -1;
 let b2b = -1;
 
 let DCDLastInvoked = Date.now();
-let garbageCap = 8;
+let ARRLastInvoked = Date.now();
 
 const SRSJLSTZKickTable = {
     "0toL": [[0,0], [1,0], [1,1], [0,-2], [1,-2]],
@@ -47,13 +48,30 @@ let DASLeftTimeout, DASRightTimeout;
 
 // HANDLING
 // all variables are in milliseconds!
-// const ARR = 0 Not implemented: ARR automatically assumed to be 0. Like, at least I play like that.
-const DAS = 100
-const DCD = 20
+let ARR = 0;
+let DAS = 100
+let DCD = 20
 const controlsPollingRate = 50; // 50 polls per second, i.e. 20ms per frame
 
+const SFX = {
+    "windup1": new Audio("garbagewindup_1.ogg"),
+    "windup2": new Audio("garbagewindup_2.ogg"),
+    "windup3": new Audio("garbagewindup_3.ogg"),
+    "windup4": new Audio("garbagewindup_4.ogg"),
+    "clearline": new Audio("clearline.ogg"),
+    "clearquad": new Audio("clearquad.ogg"),
+    "clearspin": new Audio("clearspin.ogg"),
+    "harddrop": new Audio("harddrop.ogg"),
+    "softdrop": new Audio("softdrop.ogg"),
+    "spin": new Audio("spin.ogg"),
+}
+const Windup1SFX = new Audio("garbagewindup_1.ogg")
+const Windup2SFX = new Audio("garbagewindup_2.ogg")
+const Windup3SFX = new Audio("garbagewindup_3.ogg")
+const Windup4SFX = new Audio("garbagewindup_4.ogg")
+
 // CONTROLS
-const controls = {
+let controls = {
     "CCW": {"key": "a", "held": false, "heldFrom": 0, "executedInitialAction": false},
     "CW": {"key": "d", "held": false, "heldFrom": 0, "executedInitialAction": false},
     "ROTATE_180": {"key": "w", "held": false, "heldFrom": 0, "executedInitialAction": false},
@@ -64,6 +82,19 @@ const controls = {
     "HARD_DROP": {"key": "l", "held": false, "heldFrom": 0, "executedInitialAction": false},
 }
 
+let totalAttackSent = 0;
+let gameStartedAt = Date.now();
+let totalPiecesPlaced = 0;
+let totalLinesCleared = 0;
+let garbageCap = 8;
+let lastLineClearAt = Date.now();
+let quickPlaySimulatorMode = true;
+let holdIsAvailable = true;
+
+let survivalInitialAPM = 120;
+let survivalAPMIncrease = 60;
+let survivalTimeBetweenAttacks = 5000;
+
 // -------------------- ELEMENTS ---------------------
 const playerBoard = document.getElementById("player-playfield")
 const DOMSpinTextDisplay = document.getElementById("spin-text")
@@ -72,6 +103,11 @@ const DOMComboTextDisplay = document.getElementById("combo-text")
 const DOMB2BTextDisplay = document.getElementById("b2b-text")
 const DOMSpikeTextDisplay = document.getElementById("spike-text")
 const DOMPlayerGarbageDisplay = document.getElementById("player-garbage-display")
+const DOMTimeDisplay = document.getElementById("time-text")
+const DOMPPSDisplay = document.getElementById("pps-text")
+const DOMAPMDisplay = document.getElementById("apm-text")
+const DOMAPPDisplay = document.getElementById("app-text")
+const DOMVSDisplay = document.getElementById("vs-text")
 
 // -------------------- CLASSES ---------------------
 class squareManager{
@@ -134,6 +170,15 @@ class squareManager{
 
 class playerHoldManager{
     constructor(){
+        document.getElementById("player-hold").innerHTML = "";
+        this.piece = "empty"
+        this.DOMHoldPieceContainer = document.createElement("div");
+        this.DOMHoldPieceContainer.style.position = "relative";
+        document.getElementById("player-hold").appendChild(this.DOMHoldPieceContainer);
+    }
+
+    reset(){
+        document.getElementById("player-hold").innerHTML = "";
         this.piece = "empty"
         this.DOMHoldPieceContainer = document.createElement("div");
         this.DOMHoldPieceContainer.style.position = "relative";
@@ -212,6 +257,28 @@ class playerHoldManager{
 
 class playerNextManager{
     constructor(){
+        document.getElementById("player-next").innerHTML = "";
+        let pieceContainers = []
+        let containerContents = []
+        for(let i = 0; i < previewLength; i++){
+            let newPieceContainer = document.createElement("div");
+            newPieceContainer.className = "piece-container"
+            newPieceContainer.style.position = "relative";
+            //lazy fix below, beware
+            newPieceContainer.style.transform = "translate(50%, -50%)";
+            document.getElementById("player-next").appendChild(newPieceContainer)
+            pieceContainers.push(newPieceContainer)
+            containerContents.push("")
+        }
+        this.pieceContainers = pieceContainers;
+        this.containerContents = containerContents;
+        this.bag = generateBag();
+        this.piecesUntilEndOfBag = 7-previewLength;
+        this.displayInitialQueue();
+    }
+
+    reset(){
+        document.getElementById("player-next").innerHTML = "";
         let pieceContainers = []
         let containerContents = []
         for(let i = 0; i < previewLength; i++){
@@ -338,6 +405,19 @@ class currentPieceManager{
         this.TSTKickUsed = false;
         this.currentRotationState = 0; // how many counterclockwise rotations have been applied. this is relevant for srs kicks.
         this.lastMoveWasRotation = false;
+    }
+
+    reset(){
+        this.squareCoordinates = [];
+        this.DOMSquares = [];
+        this.DOMGhost = [];
+        this.centerOfRotation = [];
+        this.piece = "";
+        this.centerOfRotationDOM = "";
+        this.TSTKickUsed = false;
+        this.currentRotationState = 0; // how many counterclockwise rotations have been applied. this is relevant for srs kicks.
+        this.lastMoveWasRotation = false;
+        this.pullFromQueue();
     }
 
     getCurrentPiece(){
@@ -586,6 +666,11 @@ class currentPieceManager{
             this.currentRotationState += CCWAngle/90;
             this.lastMoveWasRotation=true;
             this.render();
+
+            if(this.checkImmobility()){
+                SFX.spin.play()
+            }
+
             return true
         }
         return false
@@ -649,6 +734,8 @@ class currentPieceManager{
                     break;
             }
         }
+
+        DCDLastInvoked = Date.now();
     }
 
     rotateCW(){
@@ -697,6 +784,8 @@ class currentPieceManager{
                     break;
             }
         }
+
+        DCDLastInvoked = Date.now();
     }
 
     rotate180(){
@@ -721,9 +810,15 @@ class currentPieceManager{
                 this.tryRotationTests(flipKickTable["RtoL"], 180)
                 break;
         }
+
+        DCDLastInvoked = Date.now();
     }
 
-    softDrop(){
+    softDrop(sfx=true){
+        if(sfx){
+            SFX.softdrop.play()
+        }
+
         // implementation for infinite SDF, finite SDF not yet supported. gravity isn't even supported either.
         const downVisibility = this.checkVisibility("down");
         this.centerOfRotation[1] -= downVisibility;
@@ -734,6 +829,8 @@ class currentPieceManager{
             this.lastMoveWasRotation = false;
         }
         this.render();
+
+        DCDLastInvoked = Date.now();
     }
 
     lockPiece(){ // some of the code in this function could definitely be put in functions of their own.
@@ -741,8 +838,11 @@ class currentPieceManager{
         let immobility = this.checkImmobility(); //has to be checked before piece is placed on board
         let baseAttack = 0;
         let comboWeightedAttack = 0;
+        let surgeBreak = 0;
+        let allClear = false;
 
         //place piece on board
+        totalPiecesPlaced++;
         for(let i = 0; i < 4; i++){
             let currentSquare = this.squareCoordinates[i]
             playerBoardState[currentSquare[1]][currentSquare[0]] = this.piece;
@@ -757,6 +857,7 @@ class currentPieceManager{
         let shortSpinStatus = "";
         if(immobility){
             displayedSpinStatus = `mini ${this.piece}-spin`;
+            shortSpinStatus = "mini";
         }
         if(this.piece == "t" && this.lastMoveWasRotation){
             let cornerCount = 0;
@@ -792,6 +893,7 @@ class currentPieceManager{
             }
             if(cornerCount >= 3){
                 displayedSpinStatus = `mini t-spin`;
+                shortSpinStatus = "mini";
                 if(cornersFaced == 2){
                     displayedSpinStatus = `t-spin`;
                     shortSpinStatus = "spin";
@@ -859,6 +961,7 @@ class currentPieceManager{
                 clearStatus = "";
                 break;
         }
+        totalLinesCleared += rowsCleared.length;
 
         if(rowsCleared.length != 0){
             combo++;
@@ -868,6 +971,9 @@ class currentPieceManager{
                 }
             }
             else{
+                if(b2b >= 4){
+                    surgeBreak = b2b;
+                }
                 b2b=-1;
             }
         }
@@ -882,12 +988,22 @@ class currentPieceManager{
             comboWeightedAttack = downRNGRound(baseAttack*(1+0.25*combo))
         }
 
-        if(rowsCleared.length != 0){
-            comboWeightedAttack = PlayerGarbageManager.cancelGarbage(comboWeightedAttack)
-        }
-        else{
-            PlayerGarbageManager.placeGarbageOnBoard();
-        }
+        // play sfx
+        // if(rowsCleared.length != 0){
+        //     if(shortSpinStatus != ""){
+        //         SFX.clearspin.play();
+        //     }
+        //     else{
+        //         if(rowsCleared.length == 4){
+        //             SFX.clearquad.play();
+        //         }
+        //         else{
+        //             SFX.clearline.play();
+        //         }
+        //     }
+        // }
+
+        // update board
 
         for(let row = 0; row < 30; row++){
             let howMuchDoIHaveToLookDown = 0;
@@ -904,11 +1020,43 @@ class currentPieceManager{
                 }
             }
         }
+        allClear = boardIsEmpty();
+
+        comboWeightedAttack += surgeBreak + (allClear ? 5 : 0);
+        totalAttackSent += comboWeightedAttack;
+
+        //cancel garbage
+        if(rowsCleared.length != 0){
+            // comboWeightedAttack = PlayerGarbageManager.cancelGarbage(comboWeightedAttack)
+            PlayerGarbageManager.cancelGarbage(comboWeightedAttack)
+        }
+        else{
+            PlayerGarbageManager.placeGarbageOnBoard();
+        }
+
+        if(Date.now() - lastLineClearAt < 600){
+            DOMSpikeTextDisplay.innerText = parseInt(DOMSpikeTextDisplay.innerText) + comboWeightedAttack;
+        }
+        else{
+            DOMSpikeTextDisplay.innerText = comboWeightedAttack;
+        }
+        if(DOMSpikeTextDisplay.innerText == "0"){
+            DOMSpikeTextDisplay.style.display = "none";
+        }
+        else{
+            DOMSpikeTextDisplay.style.display = "block";
+        }
+
+        if(rowsCleared.length != 0){
+            lastLineClearAt = Date.now();
+        }
+        
+
+
 
         //announce clears
-        DOMClearTextDisplay.innerText = clearStatus;
+        DOMClearTextDisplay.innerText = clearStatus + (allClear ? "ALL CLEAR" : "");
         DOMSpinTextDisplay.innerText = displayedSpinStatus;
-        DOMSpikeTextDisplay.innerText = comboWeightedAttack;
         if(combo>0){
             DOMComboTextDisplay.innerText = `combo ${combo}`;
         }
@@ -926,23 +1074,67 @@ class currentPieceManager{
     }
 
     hardDrop(){
-        this.softDrop();
+        SFX.harddrop.play()
+        this.softDrop(0);
         this.lockPiece();
     }
 
     pullFromQueue(){
         const obtainedPiece = PlayerNextManager.advanceQueue();
         this.startPlacingPiece(obtainedPiece);
+        holdIsAvailable = true;
+        document.getElementById("player-hold").style.filter = "grayscale(0)"
     }
 }
 
 class playerGarbageManager{
     constructor(){
+        DOMPlayerGarbageDisplay.innerHTML = "";
         this.garbageQueue = [];
+        this.totalGarbagePiecesReceived = 0;
+        this.garbageDelay = quickPlaySimulatorMode ? 3000 : 0;
+    }
+
+    reset(){
+        DOMPlayerGarbageDisplay.innerHTML = "";
+        this.garbageQueue = [];
+        this.totalGarbagePiecesReceived = 0;
+        this.garbageDelay = quickPlaySimulatorMode ? 3000 : 0;
     }
 
     receiveGarbage(amount){
-        this.garbageQueue.push({"amount": amount, "column": randomIntegerBetween(0,9)})
+        this.totalGarbagePiecesReceived++;
+        let newGarbage = {"order":this.totalGarbagePiecesReceived, "amount": amount, "column": randomIntegerBetween(0,9), "state": this.garbageDelay == 0 ? "ready" : "new", "DOMElement": document.createElement("div")};
+        if(this.garbageDelay > 0){
+            let currentTotalGarbagePieces = this.totalGarbagePiecesReceived;
+            setTimeout(()=>{
+                let thisPieceOfGarbage = "";
+                for(let i = 0; i < this.garbageQueue.length; i++){
+                    if(this.garbageQueue[i].order == currentTotalGarbagePieces){
+                        thisPieceOfGarbage = this.garbageQueue[i]
+                    }
+                }
+                if(thisPieceOfGarbage == ""){
+                    return;
+                }
+                thisPieceOfGarbage.state = "warned"
+                thisPieceOfGarbage.DOMElement.className = `warned garbage-warning`
+            }, this.garbageDelay/2)
+            setTimeout(()=>{    
+                let thisPieceOfGarbage = "";
+                for(let i = 0; i < this.garbageQueue.length; i++){
+                    if(this.garbageQueue[i].order == currentTotalGarbagePieces){
+                        thisPieceOfGarbage = this.garbageQueue[i]
+                    }
+                }
+                if(thisPieceOfGarbage == ""){
+                    return;
+                }
+                thisPieceOfGarbage.state = "ready"
+                thisPieceOfGarbage.DOMElement.className = `ready garbage-warning`
+            }, this.garbageDelay)
+        }
+        this.garbageQueue.push(newGarbage);
         this.render();
     }
 
@@ -973,7 +1165,6 @@ class playerGarbageManager{
                 playerBoardState[y][x] = oldBoardState[y-numberOfLines][x]
                 playerSquareManagers[y][x].setContents(oldBoardState[y-numberOfLines][x])
             }
-            console.log(y, oldBoardState)
         }
         for(let y = 0; y < numberOfLines; y++){
             for(let x = 0; x < 10; x++){
@@ -985,21 +1176,37 @@ class playerGarbageManager{
 
     placeGarbageOnBoard(){
         let linesLeftToPlace = garbageCap;
+
+        let notYetReadyToPlace = [];
         while(linesLeftToPlace > 0){
             if(this.garbageQueue.length==0){
-                return;
+                break;
             }
             if(this.garbageQueue[0].amount <= linesLeftToPlace){
-                this.placeSpecificLinesOnBoard(this.garbageQueue[0].amount, this.garbageQueue[0].column)
-                linesLeftToPlace -= this.garbageQueue[0].amount;
+                if(this.garbageQueue[0].state == "ready"){
+                    this.placeSpecificLinesOnBoard(this.garbageQueue[0].amount, this.garbageQueue[0].column)
+                    linesLeftToPlace -= this.garbageQueue[0].amount;
+                }
+                else{
+                    notYetReadyToPlace.push(this.garbageQueue[0])
+                }
                 this.garbageQueue.shift();
             }
             else{
-                this.placeSpecificLinesOnBoard(linesLeftToPlace, this.garbageQueue[0].column)
-                this.garbageQueue[0].amount -= linesLeftToPlace;
-                linesLeftToPlace = 0;
+                if(this.garbageQueue[0].state == "ready"){
+                    this.placeSpecificLinesOnBoard(linesLeftToPlace, this.garbageQueue[0].column)
+                    this.garbageQueue[0].amount -= linesLeftToPlace;
+                    break;
+                }
+                else{
+                    notYetReadyToPlace.push(this.garbageQueue[0]);
+                    break;
+                }
             }
         }
+
+        this.garbageQueue = this.garbageQueue.concat(notYetReadyToPlace)
+
         this.render();
     }
 
@@ -1009,11 +1216,12 @@ class playerGarbageManager{
         let heightOfCurrentGarbageWarning = 0;
         for(let i = 0; i < this.garbageQueue.length; i++){
             let newGarbageWarning = document.createElement("div");
-            newGarbageWarning.className = "garbage-warning";
+            newGarbageWarning.className = `${this.garbageQueue[i].state} garbage-warning`;
             newGarbageWarning.style.height = `${this.garbageQueue[i].amount * squareSize}px`;
             newGarbageWarning.style.bottom = `${heightOfCurrentGarbageWarning}px`;
             DOMPlayerGarbageDisplay.appendChild(newGarbageWarning);
 
+            this.garbageQueue[i].DOMElement = newGarbageWarning;
             heightOfCurrentGarbageWarning += this.garbageQueue[i].amount * squareSize;
         }
     }
@@ -1044,6 +1252,8 @@ const generateBag = ()=>{
 }
 
 const createPlayerBoard = ()=>{
+    playerSquareManagers = []; playerBoardState = [];
+    playerBoard.innerHTML = "";
     for(let y = 0; y < 30; y++){
         let playerSquareManagerRow = []
         let playerBoardStateRow = []
@@ -1057,8 +1267,9 @@ const createPlayerBoard = ()=>{
 }
 
 const lose = ()=>{
-    alert("you have not win! you.... DIED!!! [sic]")
+    //alert("you have not win! you.... DIED!!! [sic]")
     hasDied = true;
+    document.getElementById("playfield-container").style.filter = "grayscale(1)"
 }
 
 const isCellObstructed = (x, y)=>{
@@ -1075,29 +1286,69 @@ const isCellObstructed = (x, y)=>{
 }
 
 const hold = ()=>{
-    if(PlayerHoldManager.getHoldPiece() == "empty"){
-        PlayerHoldManager.hold(PlayerCurrentPieceManager.getCurrentPiece());
-        PlayerCurrentPieceManager.pullFromQueue();
+    if(holdIsAvailable){
+        if(PlayerHoldManager.getHoldPiece() == "empty"){
+            PlayerHoldManager.hold(PlayerCurrentPieceManager.getCurrentPiece());
+            PlayerCurrentPieceManager.pullFromQueue();
+        }
+        else{
+            let newHoldPiece = PlayerCurrentPieceManager.getCurrentPiece();
+            PlayerCurrentPieceManager.startPlacingPiece(PlayerHoldManager.getHoldPiece());
+            PlayerHoldManager.hold(newHoldPiece);
+        }
     }
-    else{
-        let newHoldPiece = PlayerCurrentPieceManager.getCurrentPiece();
-        PlayerCurrentPieceManager.startPlacingPiece(PlayerHoldManager.getHoldPiece());
-        PlayerHoldManager.hold(newHoldPiece);
-    }
+    holdIsAvailable = false;
+    document.getElementById("player-hold").style.filter = "grayscale(1)"
+}
+
+const formatTimeDifference = (timeDifference)=>{
+    let ms = Math.round(timeDifference % 1000);
+    let ss = Math.floor(timeDifference / 1000) % 60;
+    let mm = Math.floor(timeDifference / 1000 / 60) % 60;
+
+    return(`${mm.toString().padStart(2, "0")}:${ss.toString().padStart(2, "0")}:${ms.toString().padStart(3, "0")}`);
 }
 
 const pollForMovement = ()=>{
+    if(hasDied){
+        return;
+    }
+
     //DAS actions
     if(Date.now() - DCDLastInvoked >= DCD){
-        if(controls.SOFT_DROP.held && Date.now()-controls.SOFT_DROP.heldFrom >= DAS){
-            PlayerCurrentPieceManager.softDrop();
+        if(ARR==0){
+            if(controls.MOVE_LEFT.held && Date.now()-controls.MOVE_LEFT.heldFrom >= DAS){
+                PlayerCurrentPieceManager.DASLeft();
+            }
+            if(controls.MOVE_RIGHT.held && Date.now()-controls.MOVE_RIGHT.heldFrom >= DAS){
+                PlayerCurrentPieceManager.DASRight();
+            }
         }
-        if(controls.MOVE_LEFT.held && Date.now()-controls.MOVE_LEFT.heldFrom >= DAS){
-            PlayerCurrentPieceManager.DASLeft();
+        else{
+            if(controls.MOVE_LEFT.held && Date.now()-controls.MOVE_LEFT.heldFrom >= DAS && Date.now()-ARRLastInvoked >= ARR){
+                PlayerCurrentPieceManager.tryToMoveLeft();
+                ARRLastInvoked = Date.now();
+            }
+            if(controls.MOVE_RIGHT.held && Date.now()-controls.MOVE_RIGHT.heldFrom >= DAS && Date.now()-ARRLastInvoked >= ARR){
+                PlayerCurrentPieceManager.tryToMoveRight();
+                ARRLastInvoked = Date.now();
+            }
+            
         }
-        if(controls.MOVE_RIGHT.held && Date.now()-controls.MOVE_RIGHT.heldFrom >= DAS){
-            PlayerCurrentPieceManager.DASRight();
-        }
+    }
+
+    const timeElapsed = Date.now() - gameStartedAt;
+    DOMTimeDisplay.innerText = `time elapsed: ${formatTimeDifference(timeElapsed)}`
+    DOMPPSDisplay.innerText = `pieces: ${totalPiecesPlaced} (${roundToTwoPlaces(totalPiecesPlaced / (timeElapsed / 1000))}/s)`
+    DOMAPMDisplay.innerText = `attack: ${totalAttackSent} (${roundToTwoPlaces(totalAttackSent / (timeElapsed / 60000))}/m)`
+    DOMAPPDisplay.innerText = `app: ${roundToTwoPlaces(totalAttackSent / totalPiecesPlaced)}`
+    DOMVSDisplay.innerText = `vs score: ${roundToTwoPlaces( (totalAttackSent + totalLinesCleared) / (timeElapsed / 100000))}`
+
+    // document.getElementById("opponent-apm").innerText = `opponent apm: ${roundToTwoPlaces(opponentLinesSent / (timeElapsed / 60000))}`
+    document.getElementById("opponent-apm").innerText = `opponent apm: ${roundToTwoPlaces((parseInt(survivalInitialAPM) + survivalAPMIncrease*(Date.now()-gameStartedAt)/60000))}`
+
+    if(ARR != 0){
+        window.requestAnimationFrame(pollForMovement)
     }
 }
 
@@ -1106,26 +1357,163 @@ const downRNGRound = (x)=>{
     return result;
 }
 
+const roundToTwoPlaces = (number)=>{
+    return Math.round(number *100) /100 // i love floating point precision issues
+}
+
 const randomIntegerBetween = (lowerBound, upperBound)=>{
     return Math.floor(Math.random()*(upperBound-lowerBound)+lowerBound)
 }
 
+const boardIsEmpty = ()=>{
+    for(let y = 0; y < 30; y++){
+        for(let x = 0; x < 10; x++){
+            if(playerBoardState[y][x] != ""){
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+// okay i'm just having fun now
+
+const tryWindup = ()=>{
+    if(hasDied){
+        return;
+    }
+    survivalInitialAPM = parseInt(survivalInitialAPM);
+
+    let targetAmount = ((survivalInitialAPM + survivalAPMIncrease*(Date.now()-gameStartedAt)/60000) / (60000 / survivalTimeBetweenAttacks)) / 1.5;
+    console.log(typeof(survivalInitialAPM));
+    let actualAmount = downRNGRound(targetAmount * (randomIntegerBetween(10,20)/10))
+    let amountRemaining = actualAmount;
+    opponentLinesSent += actualAmount;
+
+    let windupType = Math.min(Math.floor((actualAmount - 6)/3), 4)
+
+    let chunks = [];
+    for(let i = 0; i < 3; i++){
+        if(amountRemaining >= 4){
+            amountRemaining -= 4;
+            chunks.push(4);
+        }
+        else{
+            chunks.push(amountRemaining);
+            amountRemaining = 0;
+            break;
+        }
+    }
+    if(amountRemaining > 0){
+        chunks.push(amountRemaining);
+    }
+
+    for(let i = 0; i < chunks.length; i++){
+        PlayerGarbageManager.receiveGarbage(chunks[i]);
+    }
+    switch(windupType){
+        case 1:
+            SFX.windup1.play();
+            break;
+        case 2:
+            SFX.windup2.play();
+            break;
+        case 3:
+            SFX.windup3.play();
+            break;
+        case 4:
+            SFX.windup4.play();
+            break;
+        default:
+            break;
+    }
+}
+
+const importSettings = ()=>{
+    controls.CCW.key = document.getElementById("controls-ccw").value;
+    controls.CW.key = document.getElementById("controls-cw").value;
+    controls.ROTATE_180.key = document.getElementById("controls-180").value;
+    controls.MOVE_LEFT.key = document.getElementById("controls-left").value;
+    controls.MOVE_RIGHT.key = document.getElementById("controls-right").value;
+    controls.SOFT_DROP.key = document.getElementById("controls-sd").value;
+    controls.HARD_DROP.key = document.getElementById("controls-hd").value;
+    controls.HOLD.key = document.getElementById("controls-hold").value;
+
+    ARR = document.getElementById("handling-arr").value;
+    DAS = document.getElementById("handling-das").value;
+    DCD = document.getElementById("handling-dcd").value;
+
+    survivalTimeBetweenAttacks = parseInt(document.getElementById("survival-time-between-attacks").value);
+    survivalInitialAPM = parseInt(document.getElementById("survival-initial-apm").value);
+    survivalAPMIncrease = parseInt(document.getElementById("survival-apm-increase").value);
+
+    saveSettingsToLocalStorage();
+}
+
+const saveSettingsToLocalStorage = ()=>{
+    localStorage.setItem("CCW", controls.CCW.key)
+    localStorage.setItem("CW", controls.CW.key)
+    localStorage.setItem("ROTATE_180", controls.ROTATE_180.key)
+    localStorage.setItem("MOVE_LEFT", controls.MOVE_LEFT.key)
+    localStorage.setItem("MOVE_RIGHT", controls.MOVE_RIGHT.key)
+    localStorage.setItem("SOFT_DROP", controls.SOFT_DROP.key)
+    localStorage.setItem("HARD_DROP", controls.HARD_DROP.key)
+    localStorage.setItem("HOLD", controls.HOLD.key)
+
+    localStorage.setItem("DAS", DAS)
+    localStorage.setItem("DCD", DCD)
+    localStorage.setItem("ARR", ARR)
+
+    localStorage.setItem("survivalTimeBetweenAttacks", survivalTimeBetweenAttacks)
+    localStorage.setItem("survivalInitialAPM", survivalInitialAPM)
+    localStorage.setItem("survivalAPMIncrease", survivalAPMIncrease)
+
+}
+
+const getSettingsFromLocalStorage = ()=>{
+    controls.CCW.key = localStorage.getItem("CCW")
+    controls.CW.key = localStorage.getItem("CW")
+    controls.ROTATE_180.key = localStorage.getItem("ROTATE_180")
+    controls.MOVE_LEFT.key = localStorage.getItem("MOVE_LEFT")
+    controls.MOVE_RIGHT.key = localStorage.getItem("MOVE_RIGHT")
+    controls.SOFT_DROP.key = localStorage.getItem("SOFT_DROP")
+    controls.HARD_DROP.key = localStorage.getItem("HARD_DROP")
+    controls.HOLD.key = localStorage.getItem("HOLD")
+
+    ARR = localStorage.getItem("ARR")
+    DAS = localStorage.getItem("DAS")
+    DCD = localStorage.getItem("DCD")
+
+    survivalTimeBetweenAttacks = localStorage.getItem("survivalTimeBetweenAttacks")
+    survivalInitialAPM = localStorage.getItem("survivalInitialAPM")
+    survivalAPMIncrease = localStorage.getItem("survivalAPMIncrease")
+}
+
+const displaySettings = ()=>{
+    document.getElementById("controls-ccw").value = controls.CCW.key;
+    document.getElementById("controls-cw").value = controls.CW.key;
+    document.getElementById("controls-180").value = controls.ROTATE_180.key;
+    document.getElementById("controls-left").value = controls.MOVE_LEFT.key;
+    document.getElementById("controls-right").value = controls.MOVE_RIGHT.key;
+    document.getElementById("controls-sd").value = controls.SOFT_DROP.key;
+    document.getElementById("controls-hd").value = controls.HARD_DROP.key;
+    document.getElementById("controls-hold").value = controls.HOLD.key;
+
+    document.getElementById("handling-arr").value = ARR;
+    document.getElementById("handling-das").value = DAS;
+    document.getElementById("handling-dcd").value = DCD;
+
+    document.getElementById("survival-time-between-attacks").value = survivalTimeBetweenAttacks;
+    document.getElementById("survival-initial-apm").value = survivalInitialAPM;
+    document.getElementById("survival-apm-increase").value = survivalAPMIncrease;
+}
+
 // ----------------- INITIALIZATION ---------------------
-createPlayerBoard()
 
-PlayerHoldManager = new playerHoldManager()
+let pollingInterval, windupInterval, opponentLinesSent;
 
-PlayerNextManager = new playerNextManager();
-
-PlayerCurrentPieceManager = new currentPieceManager();
-
-PlayerGarbageManager = new playerGarbageManager();
-
-PlayerCurrentPieceManager.pullFromQueue();
-
-
-document.addEventListener("keydown", (e)=>{
-    if(e.repeat || hasDied){
+const onKeyDown = (e)=>{
+    if(e.repeat){
         return;
     }
     for(const [pairKey, value] of Object.entries(controls)){
@@ -1148,11 +1536,11 @@ document.addEventListener("keydown", (e)=>{
             break;
         case controls["MOVE_LEFT"].key:
             PlayerCurrentPieceManager.tryToMoveLeft();
-            setTimeout(()=>{if(controls["MOVE_LEFT"].held){PlayerCurrentPieceManager.DASLeft()}}, DAS)
+            setTimeout(()=>{if(controls["MOVE_LEFT"].held && ARR==0){PlayerCurrentPieceManager.DASLeft()}}, DAS)
             break;
         case controls["MOVE_RIGHT"].key:
             PlayerCurrentPieceManager.tryToMoveRight();
-            setTimeout(()=>{if(controls["MOVE_RIGHT"].held){PlayerCurrentPieceManager.DASRight()}}, DAS)
+            setTimeout(()=>{if(controls["MOVE_RIGHT"].held && ARR==0){PlayerCurrentPieceManager.DASRight()}}, DAS)
             break;
         case controls["SOFT_DROP"].key:
             PlayerCurrentPieceManager.softDrop();
@@ -1173,17 +1561,79 @@ document.addEventListener("keydown", (e)=>{
             PlayerGarbageManager.receiveGarbage(9);
             break;
     }
-})
+}
 
-
-document.addEventListener("keyup", (e)=>{
+const onKeyUp = (e)=>{
     for(const [pairKey, value] of Object.entries(controls)){
         if(e.key == value.key){
             controls[pairKey].held = false;
         }
     }
+}
+
+const newGame = ()=>{
+    hasDied = false;
+    gameStartedAt = Date.now();
+    totalAttackSent = 0;
+    totalLinesCleared = 0;
+    totalPiecesPlaced = 0;
+
+    document.getElementById("playfield-container").style.filter = "grayscale(0)";
+
+    clearInterval(pollingInterval); clearInterval(windupInterval);
+
+    createPlayerBoard()
+
+    PlayerHoldManager.reset(); PlayerNextManager.reset(); PlayerCurrentPieceManager.reset(); PlayerGarbageManager.reset();
+
+    if(ARR==0){
+        pollingInterval = setInterval(pollForMovement, controlsPollingRate)
+    }
+
+    opponentLinesSent = 0;
+
+    windupInterval = setInterval(()=>{tryWindup();}, 5000);
+}
+
+
+const startFirstGame = ()=>{
+
+    PlayerHoldManager = new playerHoldManager()
+
+    PlayerNextManager = new playerNextManager();
+
+    PlayerCurrentPieceManager = new currentPieceManager();
+
+    PlayerGarbageManager = new playerGarbageManager();
+
+    document.addEventListener("keydown", (e)=>{onKeyDown(e)})
+
+    document.addEventListener("keyup", (e)=>{onKeyUp(e)})
+
+    newGame();
+
+    if(ARR != 0){
+        requestAnimationFrame(pollForMovement)
+    }
+}
+
+const resetOrStartGame = ()=>{
+    if(firstGameStarted){
+        newGame();
+    }
+    else{
+        startFirstGame(); firstGameStarted = true;
+    }
+}
+
+document.getElementById("start-game").addEventListener("mousedown", resetOrStartGame)
+document.getElementById("submit").addEventListener("mousedown", importSettings)
+document.addEventListener("keypress", (e)=>{
+    console.log(e.key)
+    if(e.key == "Enter"){
+        resetOrStartGame();
+    }
 })
 
-setInterval(pollForMovement, controlsPollingRate)
-
-//JS can perform roughly on the order of 1 billion operations per second. That's... not a lot.
+getSettingsFromLocalStorage();
+displaySettings();
