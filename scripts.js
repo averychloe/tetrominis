@@ -48,6 +48,8 @@ let playerSquareManagers = []
 let PlayerHoldManager, PlayerNextManager, PlayerCurrentPieceManager, PlayerGarbageManager;
 let DASLeftTimeout, DASRightTimeout;
 
+let garbageDelay = 1000;
+
 // HANDLING
 // all variables are in milliseconds!
 let ARR = 0;
@@ -1105,14 +1107,14 @@ class playerGarbageManager{
         DOMPlayerGarbageDisplay.innerHTML = "";
         this.garbageQueue = [];
         this.totalGarbagePiecesReceived = 0;
-        this.garbageDelay = quickPlaySimulatorMode ? 3000 : 0;
+        this.garbageDelay = quickPlaySimulatorMode ? garbageDelay : 0;
     }
 
     reset(){
         DOMPlayerGarbageDisplay.innerHTML = "";
         this.garbageQueue = [];
         this.totalGarbagePiecesReceived = 0;
-        this.garbageDelay = quickPlaySimulatorMode ? 3000 : 0;
+        this.garbageDelay = quickPlaySimulatorMode ? garbageDelay : 0;
     }
 
     receiveGarbage(amount){
@@ -1487,6 +1489,7 @@ const importSettings = ()=>{
     survivalTimeBetweenAttacks = parseInt(document.getElementById("survival-time-between-attacks").value);
     survivalInitialAPM = parseInt(document.getElementById("survival-initial-apm").value);
     survivalAPMIncrease = parseInt(document.getElementById("survival-apm-increase").value);
+    garbageDelay = parseInt(document.getElementById("survival-garbage-delay").value);
 
     saveSettingsToLocalStorage();
 }
@@ -1510,6 +1513,7 @@ const saveSettingsToLocalStorage = ()=>{
     localStorage.setItem("survivalAPMIncrease", survivalAPMIncrease)
     localStorage.setItem("columnLabelling", columnLabelling ? "true" : "false")
     localStorage.setItem("labelOpacity", labelOpacity)
+    localStorage.setItem("garbageDelay", garbageDelay)
 }
 
 const getSettingsFromLocalStorage = ()=>{
@@ -1534,6 +1538,8 @@ const getSettingsFromLocalStorage = ()=>{
     document.getElementById("column-labelling").checked = columnLabelling;
     labelOpacity = parseFloat(localStorage.getItem("labelOpacity"));
     document.getElementById("label-opacity").value = labelOpacity;
+    garbageDelay = parseInt(localStorage.getItem("garbageDelay"))
+    document.getElementById("survival-garbage-delay").value = garbageDelay;
 }
 
 const displaySettings = ()=>{
