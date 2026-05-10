@@ -1117,6 +1117,7 @@ class currentPieceManager{
     hardDrop(){
         this.softDrop();
         this.lockPiece();
+        // console.log(exportState());
     }
 
     pullFromQueue(){
@@ -1624,6 +1625,18 @@ const i_winPieceLabellings = ()=>{
     }
 }
 
+const exportState = ()=>{
+    let exportedBoardState = [];
+    for(let y = 0; y < 30; y++){
+        let newRow = [];
+        for(let x = 0; x < 10; x++){
+            newRow.push(isCellObstructed(x,y))
+        }
+        exportedBoardState.push(newRow);
+    }
+    return JSON.stringify(exportedBoardState);
+}
+
 // ----------------- INITIALIZATION ---------------------
 
 let pollingInterval, windupInterval, opponentLinesSent;
@@ -1636,68 +1649,59 @@ const onKeyDown = (e)=>{
         return;
     }
     for(const [pairKey, value] of Object.entries(controls)){
-        if(e.key == value.key){
+        if(e.key.toLowerCase() == value.key.toLowerCase()){
             controls[pairKey].held = true;
             controls[pairKey].heldFrom = Date.now();
         }
     }
-    switch(e.key){
+    switch(e.key.toLowerCase()){
         default:
             DCDLastInvoked = Date.now();
             break;
-        case controls["CCW"].key:
+        case controls["CCW"].key.toLowerCase():
             PlayerCurrentPieceManager.rotateCCW();
             break;
-        case controls["CW"].key:
+        case controls["CW"].key.toLowerCase():
             PlayerCurrentPieceManager.rotateCW();
             break;  
-        case controls["ROTATE_180"].key:
+        case controls["ROTATE_180"].key.toLowerCase():
             PlayerCurrentPieceManager.rotate180();
             break;
-        case controls["MOVE_LEFT"].key:
+        case controls["MOVE_LEFT"].key.toLowerCase():
             PlayerCurrentPieceManager.tryToMoveLeft();
             controls.MOVE_LEFT.heldFrom = Date.now()
             DASLeftTimeout = setTimeout(()=>{if(controls["MOVE_LEFT"].held && ARR==0 && controls.MOVE_LEFT.heldFrom > controls.MOVE_RIGHT.heldFrom){PlayerCurrentPieceManager.DASLeft()}}, DAS)
             break;
-        case controls["MOVE_RIGHT"].key:
+        case controls["MOVE_RIGHT"].key.toLowerCase():
             PlayerCurrentPieceManager.tryToMoveRight();
             controls.MOVE_RIGHT.heldFrom = Date.now()
             DASRightTimeout = setTimeout(()=>{if(controls["MOVE_RIGHT"].held && ARR==0 && controls.MOVE_LEFT.heldFrom < controls.MOVE_RIGHT.heldFrom){PlayerCurrentPieceManager.DASRight()}}, DAS)
             break;
-        case controls["SOFT_DROP"].key:
+        case controls["SOFT_DROP"].key.toLowerCase():
             PlayerCurrentPieceManager.softDrop();
             break;
-        case controls["HARD_DROP"].key:
+        case controls["HARD_DROP"].key.toLowerCase():
             PlayerCurrentPieceManager.hardDrop();
             break;
-        case controls["HOLD"].key:
+        case controls["HOLD"].key.toLowerCase():
             hold();
-            break;
-        case "3":
-            PlayerGarbageManager.receiveGarbage(3);
-            break;
-        case "6":
-            PlayerGarbageManager.receiveGarbage(6);
-            break;
-        case "9":
-            PlayerGarbageManager.receiveGarbage(9);
             break;
     }
 }
 
 const onKeyUp = (e)=>{
     for(const [pairKey, value] of Object.entries(controls)){
-        if(e.key == value.key){
+        if(e.key.toLowerCase() == value.key.toLowerCase()){
             controls[pairKey].held = false;
         }
     }
-    switch(e.key){
+    switch(e.key.toLowerCase()){
         default:
             break;
-        case controls["MOVE_LEFT"].key:
+        case controls["MOVE_LEFT"].key.toLowerCase():
             clearTimeout(DASLeftTimeout);
             break;
-        case controls["MOVE_RIGHT"].key:
+        case controls["MOVE_RIGHT"].key.toLowerCase():
             clearTimeout(DASRightTimeout);
             break;
     }
@@ -1760,6 +1764,7 @@ const resetOrStartGame = ()=>{
 document.getElementById("start-game").addEventListener("mousedown", resetOrStartGame)
 document.getElementById("submit").addEventListener("mousedown", importSettings)
 document.addEventListener("keydown", (e)=>{
+    console.log(e.key)
     if(e.key == "Enter"){
         resetOrStartGame();
     }
