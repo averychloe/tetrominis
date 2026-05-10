@@ -1681,7 +1681,7 @@ const newGame = ()=>{
 
     opponentLinesSent = 0;
 
-    windupInterval = setInterval(()=>{tryWindup();}, 5000);
+    windupInterval = setInterval(()=>{tryWindup();}, survivalTimeBetweenAttacks);
 }
 
 
