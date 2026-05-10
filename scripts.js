@@ -7,6 +7,7 @@ let columnLabelling = false;
 const showCenterOfRotationOfMovingPiece = true;
 let labelOpacity = 0.5;
 let hasDied = false;
+let nextWindupAt = Date.now();
 
 let combo = -1;
 let b2b = -1;
@@ -68,7 +69,31 @@ const SFX = {
     "harddrop": new Audio("harddrop.ogg"),
     "softdrop": new Audio("softdrop.ogg"),
     "spin": new Audio("spin.ogg"),
+    "garbagein": new Audio("garbage_in_small.ogg")
 }
+
+const playSFX = (sfx) =>{
+    let playedSFX;
+    switch(sfx){
+        case "windup1":
+            playedSFX = new Audio("garbagewindup_1.ogg");
+            break;
+        case "windup2":
+            playedSFX = new Audio("garbagewindup_2.ogg");
+            break;
+        case "windup3":
+            playedSFX = new Audio("garbagewindup_3.ogg");
+            break;
+        case "windup4":
+            playedSFX = new Audio("garbagewindup_4.ogg");
+            break;
+        case "windup0":
+            playedSFX = new Audio("garbage_in_small.ogg");
+            break;
+    }
+    playedSFX.play();
+}
+
 const Windup1SFX = new Audio("garbagewindup_1.ogg")
 const Windup2SFX = new Audio("garbagewindup_2.ogg")
 const Windup3SFX = new Audio("garbagewindup_3.ogg")
@@ -1378,6 +1403,10 @@ const pollForMovement = ()=>{
         }
     }
 
+    if(Date.now() > nextWindupAt){
+        tryWindup();
+    }
+
     const timeElapsed = Date.now() - gameStartedAt;
     DOMTimeDisplay.innerText = `time: ${formatTimeDifference(timeElapsed)}`
     DOMPPSDisplay.innerText = `pieces: ${totalPiecesPlaced} (${roundToTwoPlaces(totalPiecesPlaced / (timeElapsed / 1000))}/s)`
@@ -1456,20 +1485,23 @@ const tryWindup = ()=>{
 
     switch(windupType){
         case 1:
-            SFX.windup1.play();
+            playSFX("windup1")
             break;
         case 2:
-            SFX.windup2.play();
+            playSFX("windup2")
             break;
         case 3:
-            SFX.windup3.play();
+            playSFX("windup3")
             break;
         case 4:
-            SFX.windup4.play();
+            playSFX("windup4")
             break;
         default:
+            playSFX("windup0")
             break;
     }
+
+    nextWindupAt = Date.now() + (survivalTimeBetweenAttacks/1.5)*(Math.random()+1);
 }
 
 const importSettings = ()=>{
@@ -1691,8 +1723,6 @@ const newGame = ()=>{
     }
 
     opponentLinesSent = 0;
-
-    windupInterval = setInterval(()=>{tryWindup();}, survivalTimeBetweenAttacks);
 }
 
 
