@@ -633,11 +633,14 @@ class currentPieceManager{
         }
     }
 
+    // well, it's probably not good practice to check whether soft drop is held **inside** this function.
     DASLeft(){
         const leftVisibility = this.checkVisibility("left");
-        this.centerOfRotation[0] -= leftVisibility;
-        for(let i = 0; i < 4; i++){
-            this.squareCoordinates[i][0]-=leftVisibility;
+        for(let i = 0; i < leftVisibility; i++){
+            this.tryToMoveLeft();
+            if(controls.SOFT_DROP.held){
+                this.softDrop();
+            }
         }
         if(leftVisibility>0){
             this.lastMoveWasRotation = false;
@@ -647,9 +650,11 @@ class currentPieceManager{
 
     DASRight(){
         const rightVisibility = this.checkVisibility("right");
-        this.centerOfRotation[0] += rightVisibility;
-        for(let i = 0; i < 4; i++){
-            this.squareCoordinates[i][0]+=rightVisibility;
+        for(let i = 0; i < rightVisibility; i++){
+            this.tryToMoveRight();
+            if(controls.SOFT_DROP.held){
+                this.softDrop();
+            }
         }
         if(rightVisibility>0){
             this.lastMoveWasRotation = false;
