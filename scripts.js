@@ -1318,6 +1318,11 @@ const formatTimeDifference = (timeDifference)=>{
     return(`${mm.toString().padStart(2, "0")}:${ss.toString().padStart(2, "0")}:${ms.toString().padStart(3, "0")}`);
 }
 
+const resetDAS = ()=>{
+    controls.MOVE_LEFT.heldFrom = Date.now();
+    controls.MOVE_RIGHT.heldFrom = Date.now();
+}
+
 const pollForMovement = ()=>{
     if(hasDied){
         return;
@@ -1332,7 +1337,7 @@ const pollForMovement = ()=>{
             if(controls.MOVE_RIGHT.held && Date.now()-controls.MOVE_RIGHT.heldFrom >= DAS && !controls.MOVE_LEFT.held){
                 PlayerCurrentPieceManager.DASRight();
             }
-            if(controls.MOVE_LEFT.held && controls.MOVE_RIGHT.held && Date.now()-controls.MOVE_LEFT.heldFrom >= DAS){
+            if(controls.MOVE_LEFT.held && controls.MOVE_RIGHT.held && Date.now()-controls.MOVE_LEFT.heldFrom >= DAS && Date.now()-controls.MOVE_RIGHT.heldFrom >= DAS){
                 if(controls.MOVE_LEFT.heldFrom > controls.MOVE_RIGHT.heldFrom){
                     PlayerCurrentPieceManager.DASLeft();
                 }
@@ -1601,12 +1606,12 @@ const onKeyDown = (e)=>{
         case controls["MOVE_LEFT"].key:
             PlayerCurrentPieceManager.tryToMoveLeft();
             controls.MOVE_LEFT.heldFrom = Date.now()
-            setTimeout(()=>{if(controls["MOVE_LEFT"].held && ARR==0 && controls.MOVE_LEFT.heldFrom > controls.MOVE_RIGHT.heldFrom){PlayerCurrentPieceManager.DASLeft()}}, DAS)
+            DASLeftTimeout = setTimeout(()=>{if(controls["MOVE_LEFT"].held && ARR==0 && controls.MOVE_LEFT.heldFrom > controls.MOVE_RIGHT.heldFrom){PlayerCurrentPieceManager.DASLeft()}}, DAS)
             break;
         case controls["MOVE_RIGHT"].key:
             PlayerCurrentPieceManager.tryToMoveRight();
             controls.MOVE_RIGHT.heldFrom = Date.now()
-            setTimeout(()=>{if(controls["MOVE_RIGHT"].held && ARR==0 && controls.MOVE_LEFT.heldFrom < controls.MOVE_RIGHT.heldFrom){PlayerCurrentPieceManager.DASRight()}}, DAS)
+            DASRightTimeout = setTimeout(()=>{if(controls["MOVE_RIGHT"].held && ARR==0 && controls.MOVE_LEFT.heldFrom < controls.MOVE_RIGHT.heldFrom){PlayerCurrentPieceManager.DASRight()}}, DAS)
             break;
         case controls["SOFT_DROP"].key:
             PlayerCurrentPieceManager.softDrop();
@@ -1634,6 +1639,16 @@ const onKeyUp = (e)=>{
         if(e.key == value.key){
             controls[pairKey].held = false;
         }
+    }
+    switch(e.key){
+        default:
+            break;
+        case controls["MOVE_LEFT"].key:
+            clearTimeout(DASLeftTimeout);
+            break;
+        case controls["MOVE_RIGHT"].key:
+            clearTimeout(DASRightTimeout);
+            break;
     }
 }
 
