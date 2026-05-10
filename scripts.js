@@ -1724,7 +1724,7 @@ document.addEventListener("keydown", (e)=>{
     }
 })
 document.getElementById("column-labelling").addEventListener("change", ()=>{
-    columnLabelling = document.getElementById("column-labelling").value;
+    columnLabelling = document.getElementById("column-labelling").checked;
 })
 document.getElementById("label-opacity").addEventListener("change", ()=>{
     labelOpacity = document.getElementById("label-opacity").value;
