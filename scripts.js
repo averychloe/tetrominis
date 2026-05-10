@@ -1726,6 +1726,10 @@ const newGame = ()=>{
         pollingInterval = setInterval(pollForMovement, controlsPollingRate)
     }
 
+    if(ARR != 0){
+        requestAnimationFrame(pollForMovement)
+    }
+
     opponentLinesSent = 0;
 }
 
@@ -1764,10 +1768,9 @@ const resetOrStartGame = ()=>{
 document.getElementById("start-game").addEventListener("mousedown", resetOrStartGame)
 document.getElementById("submit").addEventListener("mousedown", importSettings)
 document.addEventListener("keydown", (e)=>{
-    console.log(e.key)
     if(e.key == "Enter"){
         resetOrStartGame();
-    }
+    }   
 })
 document.getElementById("column-labelling").addEventListener("change", ()=>{
     columnLabelling = document.getElementById("column-labelling").checked;
