@@ -1348,15 +1348,23 @@ const pollForMovement = ()=>{
 
         }
         else{
-            if(controls.MOVE_LEFT.held && Date.now()-controls.MOVE_LEFT.heldFrom >= DAS && Date.now()-ARRLastInvoked >= ARR){
+            if(controls.MOVE_LEFT.held && Date.now()-controls.MOVE_LEFT.heldFrom >= DAS && !controls.MOVE_RIGHT.held && Date.now()-ARRLastInvoked >= ARR){
                 PlayerCurrentPieceManager.tryToMoveLeft();
                 ARRLastInvoked = Date.now();
             }
-            if(controls.MOVE_RIGHT.held && Date.now()-controls.MOVE_RIGHT.heldFrom >= DAS && Date.now()-ARRLastInvoked >= ARR){
+            if(controls.MOVE_RIGHT.held && Date.now()-controls.MOVE_RIGHT.heldFrom >= DAS && !controls.MOVE_LEFT.held && Date.now()-ARRLastInvoked >= ARR){
                 PlayerCurrentPieceManager.tryToMoveRight();
                 ARRLastInvoked = Date.now();
             }
-            
+            if(controls.MOVE_LEFT.held && controls.MOVE_RIGHT.held && Date.now()-controls.MOVE_LEFT.heldFrom >= DAS && Date.now()-controls.MOVE_RIGHT.heldFrom >= DAS && Date.now()-ARRLastInvoked >= ARR){
+                if(controls.MOVE_LEFT.heldFrom > controls.MOVE_RIGHT.heldFrom){
+                    PlayerCurrentPieceManager.tryToMoveLeft();;
+                }
+                else{
+                    PlayerCurrentPieceManager.tryToMoveRight();
+                }
+                ARRLastInvoked = Date.now();
+            }
         }
         if(controls.SOFT_DROP.held && Date.now()-controls.SOFT_DROP.heldFrom >= DAS){
             PlayerCurrentPieceManager.softDrop();
