@@ -28,7 +28,7 @@ const SRSJLSTZKickTable = {
 
 const SRSIKickTable = {
     "0toL": [[0,0], [-1,0], [2,0], [2,-1], [-1,2]],
-    "Lto2": [[0,0], [-1,0], [2,0], [-1,-2], [2,1]],
+    "Lto2": [[0,0], [1,0], [-2,0], [1,2], [-2,-1]],
     "2toR": [[0,0], [-2,0], [1,0], [-2,1], [1,-2]],
     "Rto0": [[0,0], [1,0], [-2, 0], [1, 2], [-2, -1]],
     "Lto0": [[0,0], [1,0], [-2,0], [1,-2], [-2,1]],
@@ -1498,7 +1498,9 @@ const tryWindup = ()=>{
             playSFX("windup4")
             break;
         default:
-            playSFX("windup0")
+            if(actualAmount != 0){
+                playSFX("windup0")
+            }
             break;
     }
 
